@@ -13,12 +13,12 @@ import type { Finding, FindingStatus } from '../../lib/types';
  */
 
 const QUEUES: Array<{ id: FindingStatus | 'ALL'; label: string; hint: string }> = [
-  { id: 'NEW', label: 'Needs triage', hint: 'Failures nobody has judged yet' },
-  { id: 'REOPENED', label: 'Reopened', hint: 'Came back after being closed' },
-  { id: 'CONFIRMED', label: 'Confirmed defects', hint: 'Real product bugs, awaiting a fix' },
-  { id: 'REJECTED', label: 'Not defects', hint: 'Test, environment or data problems' },
-  { id: 'CLOSED', label: 'Closed', hint: 'Done' },
-  { id: 'ALL', label: 'Everything', hint: '' },
+  { id: 'NEW', label: 'To review', hint: 'Failures nobody has decided on yet' },
+  { id: 'REOPENED', label: 'Came back', hint: 'Was closed, then failed again' },
+  { id: 'CONFIRMED', label: 'Real bugs', hint: 'Confirmed defects, waiting for a fix' },
+  { id: 'REJECTED', label: 'Not a bug', hint: 'Test, environment or data problems' },
+  { id: 'CLOSED', label: 'Done', hint: 'Finished' },
+  { id: 'ALL', label: 'All', hint: '' },
 ];
 
 export default function FindingsPage() {
@@ -56,9 +56,9 @@ export default function FindingsPage() {
       <div className="card">
         <div className="card-head">
           <div>
-            <h1>Triage inbox</h1>
+            <h1>Failures to review</h1>
             <span className="faint">
-              A failed test is a finding. It becomes a bug only when a person confirms it.
+              A failed test is not a bug yet. You decide — and only then does it get a BUG number.
             </span>
           </div>
           {loading && <span className="spinner" />}

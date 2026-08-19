@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { resolveChecks } from '../common/check-catalog';
+import { packTags, unpackTags } from '../common/db-json';
 import { OPEN_FINDING_STATUSES, RunStatus } from '../common/enums';
 import { hydrateRun } from '../common/hydrate';
 import { PolicyService } from '../policy/policy.service';
@@ -24,10 +26,20 @@ export class RunsService {
    * Creates the run and kicks off the plan phase in the background.
    * Returns immediately so the UI can navigate to the run page and poll.
    */
-  async create(dto: CreateRunDto) {
+  async create(dto: CreateRunDto, createdById?: string) {
     if (!dto.authorized) {
       throw new BadRequestException(
         'You must confirm that you are authorised to test this website before a run can start.',
+      );
+    }
+
+    // A run needs SOME statement of intent, from either source. Without one the
+    // model has nothing to test and would be forced to invent expectations.
+    const checks = resolveChecks(dto.checks ?? []);
+    const requirements = dto.requirements?.trim() ?? '';
+    if (!checks.length && requirements.length < 10) {
+      throw new BadRequestException(
+        'Tick at least one check, or describe what should work in the requirements box.',
       );
     }
 
@@ -46,11 +58,15 @@ export class RunsService {
         projectId: project.id,
         name: dto.name?.trim() || defaultRunName(dto.url),
         targetUrl: dto.url,
-        requirements: dto.requirements.trim(),
+        requirements: requirements,
+        checks: packTags(checks.map((c) => c.id)),
         authorized: dto.authorized,
         allowDestructive: Boolean(dto.allowDestructive),
         status: RunStatus.CREATED,
         statusMessage: 'Queued',
+        // WHO started this run. Without it every run is anonymous and everyone
+        // sees everyone else's work, which is what "scope" below fixes.
+        createdById: createdById ?? null,
         secret:
           dto.credentials?.email || dto.credentials?.password
             ? {
@@ -72,8 +88,17 @@ export class RunsService {
     return run;
   }
 
-  findAll() {
+  /**
+   * WHO SEES WHAT.
+   *
+   * Default is 'mine': your runs only. A shared workspace where every QA sees
+   * every other QA's target URLs is confusing and leaks which sites colleagues
+   * are testing. 'team' is still available on purpose - shared history is the
+   * point of a team tool - but you have to ask for it.
+   */
+  findAll(scope: 'mine' | 'team', userId: string) {
     return this.prisma.run.findMany({
+      where: scope === 'mine' ? { createdById: userId } : {},
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -84,6 +109,7 @@ export class RunsService {
         statusMessage: true,
         createdAt: true,
         finishedAt: true,
+        createdBy: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, name: true } },
         _count: { select: { testCases: true, findings: true } },
       },
@@ -96,6 +122,7 @@ export class RunsService {
       where: { id },
       include: {
         project: { select: { id: true, name: true, baseUrl: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
         testCases: {
           orderBy: { order: 'asc' },
           include: {
@@ -167,6 +194,20 @@ export class RunsService {
         'Approve at least one test case before running. Review the proposed cases first.',
       );
     }
+
+    // Flip to RUNNING synchronously, BEFORE returning. The client reloads the
+    // run the moment this responds; if the status were still AWAITING_APPROVAL
+    // it would conclude nothing is happening and stop polling, and the page
+    // would look frozen for the whole run.
+    await this.prisma.run.update({
+      where: { id },
+      data: {
+        status: RunStatus.RUNNING,
+        execStartedAt: new Date(),
+        finishedAt: null,
+        statusMessage: `Starting ${approved} test(s)`,
+      },
+    });
 
     this.pipeline.startExecution(id);
     return { started: true, approvedCount: approved };

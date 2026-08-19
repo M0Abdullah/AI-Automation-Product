@@ -31,6 +31,10 @@ export class AppConfigService {
   get corsOrigins() {
     return this.get('CORS_ORIGINS');
   }
+  /** Absolute base for links that leave the app (bug report exports). */
+  get publicApiUrl() {
+    return this.get('PUBLIC_API_URL').replace(/\/$/, '');
+  }
 
   // --- llm ---
   get llm() {

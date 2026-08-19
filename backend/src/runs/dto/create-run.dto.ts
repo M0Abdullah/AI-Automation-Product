@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsOptional,
   IsString,
@@ -34,12 +36,28 @@ export class CreateRunDto {
   )
   url!: string;
 
-  /** Free text, one requirement per line. This is the source of truth. */
+  /**
+   * Free text, one requirement per line. The source of truth for business rules.
+   *
+   * Optional now: a run is valid with ticked checks and no prose, because the
+   * standard checks carry their own meaning. One of the two must be present -
+   * enforced in the service, since neither field alone can express that.
+   */
+  @IsOptional()
   @IsString()
-  @Length(10, 20000, {
-    message: 'requirements must be at least 10 characters - describe what should work',
-  })
-  requirements!: string;
+  @Length(0, 20000)
+  requirements?: string;
+
+  /**
+   * Ids from the check catalogue — the boxes the user ticked.
+   * Unknown ids are dropped rather than rejected, so an older client cannot
+   * break against a newer catalogue.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @IsString({ each: true })
+  checks?: string[];
 
   @IsOptional()
   @IsString()

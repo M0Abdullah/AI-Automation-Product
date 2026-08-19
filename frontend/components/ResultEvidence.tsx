@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { artifactUrl, getResult } from '../lib/api';
 import type { ResultDetail } from '../lib/types';
+import { ScreenshotPanel } from './ScreenshotPanel';
 import { ExecutedSteps } from './StepTimeline';
 import { ResultStatusBadge } from './StatusBadge';
 
@@ -165,28 +166,15 @@ export function ResultEvidence({ resultId }: { resultId: string }) {
 
       {/* ------------------------------------------------------------ artifacts */}
       {(result.screenshotPath || result.tracePath) && (
-        <div className="stack">
-          {result.tracePath && (
-            <div className="row">
-              <a className="btn btn-sm" href={artifactUrl(result.tracePath)} download>
-                Download Playwright trace
-              </a>
-              <span className="faint">
-                Open it at trace.playwright.dev to step through the run frame by frame.
-              </span>
-            </div>
-          )}
-          {result.screenshotPath && (
-            <details className="collapse" open>
-              <summary>Screenshot at failure</summary>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="screenshot"
-                src={artifactUrl(result.screenshotPath)}
-                alt="Screenshot captured when the test failed"
-              />
-            </details>
-          )}
+        <div className="card card-tight">
+          <div className="faint" style={{ marginBottom: 7 }}>
+            EVIDENCE
+          </div>
+          <ScreenshotPanel
+            screenshotPath={result.screenshotPath}
+            tracePath={result.tracePath}
+            caption={`Attempt ${result.attempt} · ${result.browserName} ${result.viewport ?? ''}`}
+          />
         </div>
       )}
     </div>

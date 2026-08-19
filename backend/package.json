@@ -17,7 +17,8 @@
     "check:llm": "ts-node -r tsconfig-paths/register scripts/check-llm.ts",
     "check:browser": "ts-node -r tsconfig-paths/register scripts/check-browser.ts",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "test": "jest"
+    "test": "jest",
+    "set:owner": "ts-node -r tsconfig-paths/register scripts/set-owner.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

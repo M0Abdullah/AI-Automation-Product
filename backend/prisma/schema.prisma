@@ -52,6 +52,9 @@ model Run {
   name         String
   targetUrl    String
   requirements String
+  /// Comma-separated check ids from src/common/check-catalog.ts — the boxes the
+  /// user ticked. Stored so a re-plan repeats the same intent.
+  checks       String @default("")
 
   /// RunStatus — see src/common/enums.ts
   status        String  @default("CREATED")

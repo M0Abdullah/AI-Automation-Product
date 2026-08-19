@@ -14,6 +14,7 @@ import { useAuth } from './AuthProvider';
 import { BugReportActions } from './BugReportActions';
 import { CreateTicketDialog } from './CreateTicketDialog';
 import { ResultEvidence } from './ResultEvidence';
+import { ScreenshotPanel } from './ScreenshotPanel';
 import {
   ClassificationBadge,
   FindingStatusBadge,
@@ -389,6 +390,18 @@ export function FindingCard({
           BUG REPORT
         </div>
         <BugReportActions finding={finding} />
+
+        {/* The screenshot is shown here rather than hidden behind Evidence: it is
+            the first thing anyone wants to see about a failure. */}
+        {finding.result?.screenshotPath && (
+          <div style={{ marginTop: 12 }}>
+            <ScreenshotPanel
+              screenshotPath={finding.result.screenshotPath}
+              tracePath={finding.result.tracePath}
+              caption={`What the page looked like when "${finding.testCase.title}" failed`}
+            />
+          </div>
+        )}
       </div>
 
       {showEvidence && (

@@ -3,6 +3,7 @@ import { Public } from '../auth/auth.guard';
 import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CHECK_CATALOG } from './check-catalog';
 import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from './test-plan.types';
 
 /**
@@ -54,6 +55,16 @@ export class SystemController {
       actions: ALLOWED_ACTIONS,
       assertions: ALLOWED_ASSERTIONS,
       valueRefs: ['test_email', 'test_password'],
+      // The tickable checklist. Served from here so the UI and the prompt can
+      // never disagree about what a check means.
+      checks: CHECK_CATALOG.map((c) => ({
+        id: c.id,
+        label: c.label,
+        description: c.description,
+        group: c.group,
+        defaultOn: c.defaultOn,
+        requiresCredentials: Boolean(c.requiresCredentials),
+      })),
       policy: {
         maxTestCasesPerRun: this.config.policy.maxTestCasesPerRun,
         maxStepsPerCase: this.config.policy.maxStepsPerCase,

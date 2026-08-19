@@ -1,24 +1,28 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { ApiError, createRun } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { ApiError, createRun, getCapabilities } from '../lib/api';
+import type { CheckOption } from '../lib/types';
+import { CheckPicker } from './CheckPicker';
 
 /**
  * EVERYTHING WE ASK THE USER FOR.
  *
- * Three inputs and one checkbox. That is the whole MVP surface:
- *   1. the page URL
- *   2. the requirements, in plain English
- *   3. test credentials (optional)
- *   + confirmation that they are allowed to test this site
+ * Step 1  the URL
+ * Step 2  tick what to check          <- covers the standard stuff, no writing
+ * Step 3  describe your own rules     <- optional, for business logic only
+ * Step 4  test credentials            <- optional
+ * + the authorisation confirmation
+ *
+ * The checklist exists because free text alone was unforgiving: "test the login
+ * page" produced three tests that only confirmed the fields existed. Ticking
+ * boxes gives the model precise instructions with nothing to write.
  */
 
-const EXAMPLE_REQUIREMENTS = `A user can type an email address.
-A user can type a password.
-Clicking Login with valid credentials opens the dashboard.
-Clicking Login with a wrong password shows an error message.
-The email field is required and shows a message when left empty.`;
+const EXAMPLE_REQUIREMENTS = `Clicking Login with valid credentials opens /dashboard.
+A wrong password shows an error message and stays on /login.
+The email field rejects a value that is not an email address.`;
 
 export function RunForm() {
   const router = useRouter();
@@ -32,9 +36,26 @@ export function RunForm() {
   const [allowDestructive, setAllowDestructive] = useState(false);
   const [showCreds, setShowCreds] = useState(false);
 
+  const [options, setOptions] = useState<CheckOption[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<string[]>([]);
+
+  // The catalogue and its defaults both come from the backend, so the ticked
+  // boxes on first load are the ones the server considers cheap and useful.
+  useEffect(() => {
+    getCapabilities()
+      .then((caps) => {
+        setOptions(caps.checks ?? []);
+        setSelected((caps.checks ?? []).filter((c) => c.defaultOn).map((c) => c.id));
+      })
+      .catch(() => setOptions([]));
+  }, []);
+
+  const hasCredentials = Boolean(email.trim() || password.trim());
+  const ready = authorized && url.trim().length > 0 && (selected.length > 0 || requirements.trim().length >= 10);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,38 +66,28 @@ export function RunForm() {
     try {
       const run = await createRun({
         url: url.trim(),
-        requirements: requirements.trim(),
+        requirements: requirements.trim() || undefined,
+        checks: selected,
         name: name.trim() || undefined,
         authorized,
         allowDestructive,
-        credentials:
-          email || password
-            ? { email: email || undefined, password: password || undefined }
-            : undefined,
+        credentials: hasCredentials
+          ? { email: email.trim() || undefined, password: password || undefined }
+          : undefined,
       });
       router.push(`/runs/${run.id}`);
     } catch (err) {
-      const e = err as ApiError;
-      setError(e.message);
-      if (Array.isArray(e.details)) setDetails(e.details as string[]);
+      const e2 = err as ApiError;
+      setError(e2.message);
+      if (Array.isArray(e2.details)) setDetails(e2.details as string[]);
       setSubmitting(false);
     }
   };
 
   return (
-    <form className="card" onSubmit={submit}>
-      <div className="card-head">
-        <div>
-          <h2>Start a test run</h2>
-          <span className="faint">
-            Give a page and describe what should work. The AI proposes test cases; you approve them
-            before anything runs.
-          </span>
-        </div>
-      </div>
-
+    <form className="stack" onSubmit={submit}>
       {error && (
-        <div className="banner banner-error" style={{ marginBottom: 14 }}>
+        <div className="banner banner-error">
           <div>
             <strong>{error}</strong>
             {details.length > 0 && (
@@ -90,11 +101,15 @@ export function RunForm() {
         </div>
       )}
 
-      <label className="field">
-        <span className="field-label">1. Page URL</span>
-        <span className="field-hint">
-          A staging or local page you are authorised to test. Include http:// or https://
-        </span>
+      {/* ------------------------------------------------------- 1. the URL */}
+      <div className="card">
+        <div className="step-head">
+          <span className="step-num">1</span>
+          <div>
+            <h2>Which page?</h2>
+            <span className="faint">A staging or local page you are allowed to test.</span>
+          </div>
+        </div>
         <input
           type="url"
           required
@@ -102,49 +117,96 @@ export function RunForm() {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
-      </label>
+      </div>
 
-      <label className="field">
-        <span className="field-label">2. Requirements</span>
-        <span className="field-hint">
-          One per line, plain English. This is the source of truth - the AI is not allowed to assert
-          anything you did not write here.
-        </span>
+      {/* --------------------------------------------------- 2. the checklist */}
+      <div className="card">
+        <div className="step-head">
+          <span className="step-num">2</span>
+          <div>
+            <h2>What should we check?</h2>
+            <span className="faint">
+              Tick the boxes. These need no writing — they work on any page.
+            </span>
+          </div>
+        </div>
+
+        {options.length === 0 ? (
+          <div className="faint">
+            <span className="spinner" /> Loading the checklist
+          </div>
+        ) : (
+          <CheckPicker
+            options={options}
+            selected={selected}
+            onChange={setSelected}
+            hasCredentials={hasCredentials}
+          />
+        )}
+      </div>
+
+      {/* ------------------------------------------------- 3. your own rules */}
+      <div className="card">
+        <div className="step-head">
+          <span className="step-num">3</span>
+          <div>
+            <h2>Your own rules</h2>
+            <span className="faint">
+              Optional. For things only you know — what happens after login, what a
+              discount should do. One per line.
+            </span>
+          </div>
+        </div>
         <textarea
-          required
-          rows={8}
+          rows={6}
           placeholder={EXAMPLE_REQUIREMENTS}
           value={requirements}
           onChange={(e) => setRequirements(e.target.value)}
         />
-        <button
-          type="button"
-          className="btn btn-sm btn-ghost"
-          style={{ marginTop: 6 }}
-          onClick={() => setRequirements(EXAMPLE_REQUIREMENTS)}
-        >
-          Use the login example
-        </button>
-      </label>
+        <div className="row" style={{ marginTop: 7 }}>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={() => setRequirements(EXAMPLE_REQUIREMENTS)}
+          >
+            Use an example
+          </button>
+          <span className="faint">
+            The AI may not assert anything you did not write here.
+          </span>
+        </div>
+      </div>
 
-      <div className="field">
-        <button
-          type="button"
-          className="btn btn-sm btn-ghost"
-          onClick={() => setShowCreds((v) => !v)}
-        >
-          {showCreds ? '▾' : '▸'} 3. Test credentials (optional)
-        </button>
-        {showCreds && (
-          <div className="card card-tight" style={{ marginTop: 8 }}>
-            <span className="field-hint">
-              Encrypted before storage. The AI never sees these values - it only writes{' '}
-              <code>test_email</code> and <code>test_password</code> references, and the browser
-              swaps in the real value at typing time.
+      {/* --------------------------------------------------- 4. credentials */}
+      <div className="card">
+        <div className="step-head">
+          <span className="step-num">4</span>
+          <div>
+            <h2>Test login</h2>
+            <span className="faint">
+              Optional. Needed only for the two login checks.
             </span>
-            <div className="grid-2" style={{ marginTop: 8 }}>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setShowCreds((v) => !v)}
+          >
+            {showCreds ? 'Hide' : hasCredentials ? 'Edit' : 'Add'}
+          </button>
+        </div>
+
+        {showCreds ? (
+          <>
+            <span className="field-hint">
+              Encrypted before storage. The AI never sees these values — it writes{' '}
+              <code>test_email</code> / <code>test_password</code>, and the browser swaps in the
+              real value at typing time.
+            </span>
+            <div className="grid-2">
               <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Test email</span>
+                <span className="field-label">Email or username</span>
                 <input
                   type="text"
                   autoComplete="off"
@@ -154,7 +216,7 @@ export function RunForm() {
                 />
               </label>
               <label className="field" style={{ marginBottom: 0 }}>
-                <span className="field-label">Test password</span>
+                <span className="field-label">Password</span>
                 <input
                   type="password"
                   autoComplete="off"
@@ -164,21 +226,26 @@ export function RunForm() {
                 />
               </label>
             </div>
-          </div>
+          </>
+        ) : (
+          <span className="faint">
+            {hasCredentials ? 'Credentials saved for this run.' : 'No credentials — login checks are off.'}
+          </span>
         )}
       </div>
 
-      <label className="field">
-        <span className="field-label">Run name (optional)</span>
-        <input
-          type="text"
-          placeholder="Login smoke - sprint 12"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
+      {/* ------------------------------------------------------ confirm + go */}
+      <div className="card">
+        <label className="field" style={{ marginBottom: 14 }}>
+          <span className="field-label">Name this run (optional)</span>
+          <input
+            type="text"
+            placeholder="Login smoke - sprint 12"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
 
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
         <label className="checkbox">
           <input
             type="checkbox"
@@ -186,10 +253,10 @@ export function RunForm() {
             onChange={(e) => setAuthorized(e.target.checked)}
           />
           <span>
-            <strong>I am authorised to test this website.</strong>
+            <strong>I am allowed to test this website.</strong>
             <br />
             <span className="faint">
-              Required. An automated browser will open the page and interact with it.
+              Required. A real browser will open the page and interact with it.
             </span>
           </span>
         </label>
@@ -201,35 +268,39 @@ export function RunForm() {
             onChange={(e) => setAllowDestructive(e.target.checked)}
           />
           <span>
-            Allow destructive actions (delete, pay, send)
+            Allow Delete / Pay / Send buttons
             <br />
             <span className="faint">
-              Leave this off. When off, any step whose target contains a destructive keyword is
-              rejected before it can run.
+              Leave this off. When off, any step targeting those words is blocked before it runs.
             </span>
           </span>
         </label>
-      </div>
 
-      <button
-        type="submit"
-        className="btn btn-primary"
-        disabled={submitting || !authorized}
-        style={{ marginTop: 8 }}
-      >
-        {submitting ? (
-          <>
-            <span className="spinner" /> Starting
-          </>
-        ) : (
-          'Scan page and generate test cases'
+        <button
+          type="submit"
+          className="btn btn-primary btn-lg btn-block"
+          disabled={submitting || !ready}
+          style={{ marginTop: 6 }}
+        >
+          {submitting ? (
+            <>
+              <span className="spinner" /> Starting
+            </>
+          ) : (
+            'Read the page and write the tests'
+          )}
+        </button>
+
+        {!ready && (
+          <div className="faint" style={{ marginTop: 8, textAlign: 'center' }}>
+            {!url.trim()
+              ? 'Add a page URL to continue.'
+              : selected.length === 0 && requirements.trim().length < 10
+                ? 'Tick at least one check, or write your own rules.'
+                : 'Tick the authorisation box to continue.'}
+          </div>
         )}
-      </button>
-      {!authorized && (
-        <span className="faint" style={{ marginLeft: 10 }}>
-          Tick the authorisation box to continue.
-        </span>
-      )}
+      </div>
     </form>
   );
 }

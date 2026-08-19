@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../components/AuthProvider';
+import { ScreenshotPanel } from '../../../components/ScreenshotPanel';
 import { PriorityBadge, TicketStatusBadge } from '../../../components/StatusBadge';
 import {
   ApiError,
@@ -224,6 +225,23 @@ export default function TicketPage() {
       <div className="grid-sidebar">
         {/* ----------------------------------------------------- description */}
         <div className="stack">
+          {ticket.finding?.result?.screenshotPath && (
+            <div className="card">
+              <div className="card-head">
+                <h2>What it looked like</h2>
+                <span className="faint">
+                  {ticket.finding.result.browserName} · attempt{' '}
+                  {ticket.finding.result.attempt}
+                </span>
+              </div>
+              <ScreenshotPanel
+                screenshotPath={ticket.finding.result.screenshotPath}
+                tracePath={ticket.finding.result.tracePath}
+                caption={`Captured when the test failed · ${ticket.finding.result.viewport ?? ''}`}
+              />
+            </div>
+          )}
+
           <div className="card">
             <div className="card-head">
               <h2>Bug report</h2>

@@ -1,3 +1,4 @@
+import type { CheckDefinition } from '../../common/check-catalog';
 import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from '../../common/test-plan.types';
 import type { PageSnapshot } from '../../browser/browser.types';
 
@@ -83,18 +84,44 @@ export interface TestPlanPromptInput {
   snapshot: PageSnapshot;
   hasCredentials: boolean;
   maxCases: number;
+  /** The boxes the user ticked, resolved to their instructions. */
+  checks: CheckDefinition[];
 }
 
 export function buildTestPlanUserPrompt(input: TestPlanPromptInput): string {
-  const { requirements, snapshot, hasCredentials, maxCases } = input;
+  const { requirements, snapshot, hasCredentials, maxCases, checks } = input;
 
   const lines: string[] = [];
 
-  lines.push('REQUIREMENTS (authoritative - written by the QA engineer)');
-  lines.push('"""');
-  lines.push(requirements.trim());
-  lines.push('"""');
-  lines.push('');
+  // The ticked checks come FIRST: they are unambiguous instructions, whereas
+  // free-text requirements may be vague. Putting them first also means a run
+  // with no prose still has a clear task at the top of the prompt.
+  if (checks.length) {
+    lines.push('CHECKS THE USER ASKED FOR (do all of these)');
+    for (const c of checks) {
+      lines.push(`- ${c.label}: ${c.instruction}`);
+    }
+    lines.push('');
+    lines.push(
+      'Skip any check that does not apply to this page, and list it under "untestable" ' +
+        'with the reason. Do not invent an element to satisfy a check.',
+    );
+    lines.push('');
+  }
+
+  if (requirements.trim()) {
+    lines.push('REQUIREMENTS (authoritative - written by the QA engineer)');
+    lines.push('"""');
+    lines.push(requirements.trim());
+    lines.push('"""');
+    lines.push('');
+  } else {
+    lines.push(
+      'NO written requirements were given. Cover ONLY the checks listed above. Do not ' +
+        'assert business behaviour you cannot verify from the page itself.',
+    );
+    lines.push('');
+  }
 
   lines.push('TEST DATA AVAILABLE');
   lines.push(

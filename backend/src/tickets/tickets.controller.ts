@@ -25,13 +25,23 @@ export class TicketsController {
   }
 
   @Get('tickets')
-  findAll(@Query('status') status?: string, @Query('assigneeId') assigneeId?: string) {
-    return this.tickets.findAll({ status, assigneeId });
+  findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query('status') status?: string,
+    @Query('assigneeId') assigneeId?: string,
+    @Query('scope') scope?: string,
+  ) {
+    return this.tickets.findAll({
+      status,
+      assigneeId,
+      scope: scope === 'team' ? 'team' : 'mine',
+      userId: user.sub,
+    });
   }
 
   @Get('tickets/stats')
-  stats() {
-    return this.tickets.stats();
+  stats(@CurrentUser() user: JwtPayload, @Query('scope') scope?: string) {
+    return this.tickets.stats(scope === 'team' ? 'team' : 'mine', user.sub);
   }
 
   /** Accepts the uuid or the human key (TICKET-007). */

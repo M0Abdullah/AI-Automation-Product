@@ -38,6 +38,10 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: int(4000, 1),
   CORS_ORIGINS: csv(['http://localhost:3000']),
+  // Where this API is reachable from OUTSIDE. Used to build absolute links in
+  // exported bug reports - a relative /api/artifacts path renders as a broken
+  // image once the Markdown is pasted into Jira or Slack.
+  PUBLIC_API_URL: z.string().url().default('http://localhost:4000'),
 
   // --- database ---
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

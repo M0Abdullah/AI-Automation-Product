@@ -165,6 +165,20 @@ export interface Finding {
   createdAt: string;
   testCase: { id: string; title: string; priority: string; requirement?: string | null };
   events: FindingEvent[];
+  /** Present on list responses, so the screenshot can render without a second fetch. */
+  result?: {
+    id: string;
+    status: string;
+    errorType?: string | null;
+    errorMessage?: string | null;
+    expected?: string | null;
+    actual?: string | null;
+    screenshotPath?: string | null;
+    tracePath?: string | null;
+    finalUrl?: string | null;
+    browserName?: string | null;
+    viewport?: string | null;
+  } | null;
 }
 
 export interface PolicyRejection {
@@ -347,6 +361,14 @@ export interface Ticket {
     occurrences: number;
     runId: string;
     testCaseId: string;
+    result?: {
+      id: string;
+      screenshotPath?: string | null;
+      tracePath?: string | null;
+      browserName?: string | null;
+      viewport?: string | null;
+      attempt?: number;
+    } | null;
   };
   comments?: TicketComment[];
   events?: TicketEvent[];
@@ -378,3 +400,71 @@ export const SEVERITY_LABEL: Record<string, string> = {
   S3_MINOR: 'S3 Minor',
   S4_TRIVIAL: 'S4 Trivial',
 };
+
+// ================================================================= dashboard
+
+export interface DashboardOverview {
+  runs: { total: number; byStatus: Record<string, number> };
+  tests: {
+    total: number;
+    approved: number;
+    humanEdited: number;
+    executed: number;
+    passed: number;
+    failed: number;
+    errored: number;
+    flaky: number;
+    /** null when nothing has been executed yet - not 0, which would read as "all failing". */
+    passRate: number | null;
+  };
+  findings: {
+    byStatus: Record<string, number>;
+    awaitingTriage: number;
+    confirmed: number;
+    bySeverity: Record<string, number>;
+    byClassification: Record<string, number>;
+  };
+  tickets: {
+    byStatus: Record<string, number>;
+    open: number;
+    readyForRetest: number;
+  };
+  llm: { tokensIn: number; tokensOut: number };
+  recentRuns: Array<{
+    id: string;
+    name: string;
+    targetUrl: string;
+    status: RunStatus;
+    statusMessage?: string | null;
+    createdAt: string;
+    _count: { testCases: number; findings: number };
+  }>;
+  needsTriage: Array<{
+    id: string;
+    bugKey?: string | null;
+    status: FindingStatus;
+    aiClassification?: Classification | null;
+    aiConfidence?: number | null;
+    occurrences: number;
+    runId: string;
+    testCase: { title: string; priority: string };
+  }>;
+  needsRetest: Array<{
+    id: string;
+    key: string;
+    title: string;
+    status: TicketStatus;
+    priority: string;
+    assignee?: { name: string } | null;
+  }>;
+}
+
+/** One tickable check, served by /api/capabilities. */
+export interface CheckOption {
+  id: string;
+  label: string;
+  description: string;
+  group: string;
+  defaultOn: boolean;
+  requiresCredentials: boolean;
+}
