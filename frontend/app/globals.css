@@ -68,8 +68,14 @@
   --header-h: 60px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* DARK IS THE DEFAULT. <html data-theme="dark"> is set server-side and
+   re-applied before paint by the init script in layout.tsx.
+
+   The light values above sit on bare :root as the base layer, so selecting
+   data-theme="light" simply stops this block matching. "System" re-enables the
+   prefers-color-scheme media query further down. */
+:root[data-theme='dark'],
+:root[data-theme='system'] {
     --bg: #0a0b0f;
     --bg-tint: #12141c;
     --surface: #14161d;
@@ -107,7 +113,95 @@
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -4px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.5), 0 24px 56px -12px rgba(0, 0, 0, 0.7);
     --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+
+/* "System" mode: only go dark when the OS is dark. Selecting Light or Dark
+   explicitly bypasses this entirely. */
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    --bg: #f6f7f9;
+    --bg-tint: #eef0f6;
+    --surface: #ffffff;
+    --surface-2: #f4f5f8;
+    --surface-3: #e9ebf1;
+    --border: #e8eaf0;
+    --border-strong: #d5d9e2;
+    --text: #0d1117;
+    --text-dim: #5b6472;
+    --text-faint: #939cab;
+    --brand: #5b5bd6;
+    --brand-hover: #4a4ac4;
+    --brand-soft: #eef0fe;
+    --brand-border: #dcdefc;
+    --pass: #067647;
+    --pass-bg: #e7f7ee;
+    --pass-border: #a9e0c1;
+    --fail: #c01048;
+    --fail-bg: #fdeef1;
+    --fail-border: #f7c4d0;
+    --warn: #b54708;
+    --warn-bg: #fef6e7;
+    --warn-border: #f7dfae;
+    --info: #175cd3;
+    --info-bg: #eff6ff;
+    --info-border: #bcd7fb;
+    --neutral: #5b6472;
+    --neutral-bg: #f0f2f5;
+    --neutral-border: #dde1e8;
+    --shadow-sm: 0 1px 2px rgba(13, 17, 23, 0.04), 0 1px 3px rgba(13, 17, 23, 0.03);
+    --shadow:
+      0 1px 2px rgba(13, 17, 23, 0.04), 0 4px 10px -2px rgba(13, 17, 23, 0.06),
+      0 12px 24px -8px rgba(13, 17, 23, 0.05);
+    --shadow-lg:
+      0 2px 4px rgba(13, 17, 23, 0.05), 0 12px 28px -6px rgba(13, 17, 23, 0.1),
+      0 32px 64px -16px rgba(13, 17, 23, 0.14);
+    --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
   }
+}
+
+/* Only the colours transition, so switching theme does not animate layout. */
+html.theme-ready body,
+html.theme-ready .card,
+html.theme-ready .sidebar,
+html.theme-ready .btn,
+html.theme-ready input,
+html.theme-ready textarea,
+html.theme-ready select {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+/* -------------------------------------------------------- theme switcher -- */
+
+.theme-switch {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+}
+.theme-switch button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 9px;
+  border-radius: 16px;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.theme-switch button:hover {
+  color: var(--text);
+}
+.theme-switch button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 
 * {

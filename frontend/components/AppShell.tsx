@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { getFindingStats, getHealth, getTicketStats } from '../lib/api';
 import { ROLE_LABEL } from '../lib/auth';
 import { useAuth } from './AuthProvider';
+import { ThemeToggle } from './ThemeToggle';
 import {
   IconAlert,
   IconBug,
@@ -176,6 +177,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span className="pill">
             {user.email} · {ROLE_LABEL[user.role]}
           </span>
+          <ThemeToggle />
           <HealthDot />
         </div>
         <div className="content">{children}</div>

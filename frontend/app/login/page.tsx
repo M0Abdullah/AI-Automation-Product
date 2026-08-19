@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '../../components/AuthProvider';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import type { ApiError } from '../../lib/api';
 
 export default function LoginPage() {
@@ -28,9 +29,12 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
-        <div className="auth-brand">
-          <span className="brand-mark">AI</span>
-          <span>Testing Platform</span>
+        <div className="spread" style={{ marginBottom: 18 }}>
+          <div className="auth-brand" style={{ marginBottom: 0 }}>
+            <span className="brand-mark">AI</span>
+            <span>Testing Platform</span>
+          </div>
+          <ThemeToggle />
         </div>
 
         <div className="auth-title">Sign in</div>

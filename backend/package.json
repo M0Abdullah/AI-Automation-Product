@@ -18,7 +18,8 @@
     "check:browser": "ts-node -r tsconfig-paths/register scripts/check-browser.ts",
     "lint": "eslint \"src/**/*.ts\" --fix",
     "test": "jest",
-    "set:owner": "ts-node -r tsconfig-paths/register scripts/set-owner.ts"
+    "set:owner": "ts-node -r tsconfig-paths/register scripts/set-owner.ts",
+    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../kill-ports.ps1"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
