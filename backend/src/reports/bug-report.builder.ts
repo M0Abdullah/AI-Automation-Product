@@ -261,48 +261,221 @@ export function renderHtml(d: BugReportData): string {
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${esc(d.bugKey)} — ${esc(d.title)}</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm; }
+  /* SCREEN FIRST, PRINT SECOND.
+     This document is read two ways: in a browser tab via "Open report", and
+     printed to PDF by Chrome. It used to be styled only for A4 - mm units and
+     @page - which is why it looked like a bare wall of text on screen. The
+     screen rules are now the default and @media print restores the A4 layout. */
+
+  :root {
+    --ink: #0d1117;
+    --dim: #5b6472;
+    --faint: #939cab;
+    --line: #e8eaf0;
+    --panel: #f6f7f9;
+    --card: #ffffff;
+    --brand: #5b5bd6;
+    --pass: #067647;
+    --fail: #c01048;
+    --warn: #b54708;
+  }
+
   * { box-sizing: border-box; }
-  body { font: 11pt/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-         color: #16191d; margin: 0; }
-  h1 { font-size: 20pt; margin: 0 0 2mm; }
-  h2 { font-size: 12pt; margin: 7mm 0 2mm; padding-bottom: 1mm;
-       border-bottom: 1px solid #dfe3e8; }
-  .sub { color: #5c6572; font-size: 10pt; margin-bottom: 4mm; }
-  .chips { margin: 0 0 4mm; }
-  .chip { display: inline-block; padding: 1mm 2.5mm; border-radius: 3mm; font-size: 8.5pt;
-          background: #eef0f3; color: #16191d; margin: 0 1.5mm 1.5mm 0; }
-  .chip.bad { background: #fdeaea; color: #c62828; }
-  .chip.warn { background: #fdf3e0; color: #a86800; }
-  .chip.ok { background: #e6f6ec; color: #17864b; }
-  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-  th, td { text-align: left; padding: 1.6mm 2mm; border-bottom: 1px solid #eceef1;
-           vertical-align: top; }
-  th { width: 34mm; color: #5c6572; font-weight: 600; }
-  ol { margin: 0; padding-left: 6mm; }
-  ol li { margin-bottom: 1.2mm; }
-  .compare { display: flex; gap: 4mm; margin-top: 2mm; }
-  .compare > div { flex: 1; padding: 2.5mm 3mm; border-radius: 1.5mm; background: #f6f7f9; }
-  .compare .lbl { font-size: 8pt; text-transform: uppercase; letter-spacing: .04em;
-                  color: #8a93a0; margin-bottom: 1mm; }
-  .expected { border-left: 1mm solid #17864b; }
-  .actual { border-left: 1mm solid #c62828; }
-  pre.log { background: #f6f7f9; border: 1px solid #e4e7eb; border-radius: 1.5mm;
-            padding: 2.5mm 3mm; font: 8.5pt/1.45 ui-monospace, Consolas, monospace;
-            white-space: pre-wrap; word-break: break-all; margin: 0; }
+
+  body {
+    margin: 0;
+    padding: 32px 20px 64px;
+    background: #f0f1f5;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+      Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* A readable column. Full-bleed text across a 1900px monitor was the single
+     worst thing about the old version. */
+  .sheet {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 40px 44px 36px;
+    box-shadow: 0 1px 2px rgba(13, 17, 23, 0.04), 0 12px 32px -8px rgba(13, 17, 23, 0.08);
+  }
+
+  h1 {
+    font-size: 25px;
+    line-height: 1.25;
+    letter-spacing: -0.022em;
+    font-weight: 680;
+    margin: 0 0 6px;
+  }
+
+  h2 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 34px 0 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .sub { color: var(--dim); font-size: 14px; margin-bottom: 18px; }
+  .sub a { color: var(--brand); }
+
+  .chips { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    display: inline-block;
+    padding: 4px 11px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 550;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--dim);
+  }
+  .chip b { color: var(--ink); font-weight: 650; }
+  .chip.bad { background: #fdeef1; border-color: #f7c4d0; color: var(--fail); }
+  .chip.warn { background: #fef6e7; border-color: #f7dfae; color: var(--warn); }
+  .chip.ok { background: #e7f7ee; border-color: #a9e0c1; color: var(--pass); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  /* Constrained, not 50% of a wide screen — the old label column left a canyon
+     of white space between the name and its value. */
+  th { width: 150px; color: var(--faint); font-weight: 600; font-size: 13px; }
+  tr:last-child th, tr:last-child td { border-bottom: none; }
+  td { word-break: break-word; }
+
+  ol { margin: 0; padding-left: 22px; }
+  ol li { margin-bottom: 6px; }
+
+  .compare { display: flex; gap: 14px; margin-top: 4px; }
+  .compare > div {
+    flex: 1;
+    padding: 12px 15px;
+    border-radius: 10px;
+    background: var(--panel);
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .compare .lbl {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--faint);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .expected { border-left: 3px solid var(--pass); }
+  .actual { border-left: 3px solid var(--fail); }
+
+  pre.log {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px 15px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+  }
   pre.log.err { color: #b3261e; }
-  .count { background: #eef0f3; border-radius: 3mm; padding: 0 2mm; font-size: 8.5pt;
-           color: #5c6572; font-weight: 600; }
-  .ai { background: #f3f6ff; border: 1px solid #d7e2fb; border-radius: 2mm;
-        padding: 3mm; font-size: 9.5pt; }
-  .ai .warnlbl { color: #a86800; font-weight: 700; font-size: 8.5pt;
-                 text-transform: uppercase; letter-spacing: .04em; }
-  .shot { margin-top: 2mm; }
-  .shot img { max-width: 100%; border: 1px solid #dfe3e8; border-radius: 1.5mm; }
-  footer { margin-top: 8mm; padding-top: 2mm; border-top: 1px solid #dfe3e8;
-           color: #8a93a0; font-size: 8pt; }
-  .avoid-break { break-inside: avoid; }
+
+  .count {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: var(--dim);
+    font-weight: 650;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-left: 6px;
+  }
+
+  .ai {
+    background: #f3f6ff;
+    border: 1px solid #d7e2fb;
+    border-radius: 10px;
+    padding: 15px 17px;
+    font-size: 14px;
+  }
+  .ai p { margin: 0 0 8px; }
+  .ai p:last-child { margin-bottom: 0; }
+  .ai .warnlbl {
+    color: var(--warn);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .shot { margin-top: 4px; }
+  .shot img {
+    max-width: 100%;
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  footer {
+    margin-top: 36px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    font-size: 12px;
+  }
+
+  @media (max-width: 620px) {
+    body { padding: 14px 10px 40px; }
+    .sheet { padding: 24px 20px; border-radius: 10px; }
+    .compare { flex-direction: column; }
+    th { width: auto; }
+  }
+
+  /* ------------------------------------------------------------ PRINT / PDF */
+  /* Chrome prints this document to produce BUG-nnn.pdf, so A4 sizing lives here
+     rather than in the base rules. */
+  @media print {
+    @page { size: A4; margin: 16mm 14mm; }
+    body { padding: 0; background: #fff; font-size: 10.5pt; line-height: 1.5; }
+    .sheet {
+      max-width: none;
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    h1 { font-size: 19pt; }
+    h2 { font-size: 9.5pt; margin: 6mm 0 2mm; }
+    .sub { font-size: 9.5pt; margin-bottom: 4mm; }
+    table, .compare > div, pre.log, .ai { font-size: 9pt; }
+    pre.log { font-size: 8.5pt; }
+    .chip { font-size: 8.5pt; padding: 1mm 2.5mm; }
+    /* Keep a panel from being split across two pages. */
+    .avoid-break { break-inside: avoid; }
+    tr { break-inside: avoid; }
+    h2 { break-after: avoid; }
+    footer { margin-top: 8mm; font-size: 8pt; }
+  }
 </style></head><body>
+<div class="sheet">
 
 <h1>${esc(d.bugKey)} — ${esc(d.title)}</h1>
 <div class="sub">${esc(d.environment.runName)} · ${esc(d.environment.url)}</div>
@@ -384,5 +557,6 @@ ${
   ${esc(d.bugKey)} · Generated by AI Testing Platform · ${new Date().toISOString()}
   ${d.traceUrl ? `<br>Playwright trace available in the platform (open at trace.playwright.dev)` : ''}
 </footer>
+</div>
 </body></html>`;
 }

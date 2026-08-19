@@ -338,6 +338,50 @@ export async function downloadReport(findingId: string, bugKey: string) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Opens the HTML report in a new tab.
+ *
+ * It cannot be a plain <a href> — the report endpoint requires a bearer token,
+ * and an anchor cannot send headers, so the tab would show a 401. So we fetch it
+ * with the token and hand the browser a blob instead.
+ *
+ * The tab is opened BEFORE the await: browsers only allow window.open during a
+ * user gesture, and awaiting first would lose that and get the popup blocked.
+ */
+export async function openReport(findingId: string) {
+  const tab = window.open('', '_blank');
+  if (tab) {
+    tab.document.write(
+      '<!doctype html><title>Loading report…</title>' +
+        '<body style="font:15px system-ui;padding:40px;color:#5b6472">Building the report…</body>',
+    );
+  }
+
+  try {
+    const res = await fetch(reportUrl(findingId, 'html'), {
+      headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
+    });
+    if (!res.ok) throw new ApiError(`Could not build the report (${res.status})`, res.status);
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    if (tab) {
+      tab.location.replace(url);
+    } else {
+      // Popup blocked — fall back to the current tab rather than failing silently.
+      window.location.assign(url);
+    }
+
+    // Revoked on a delay: revoking immediately can cancel the navigation before
+    // the new tab has finished reading the blob.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}
+
 /** Fetches the markdown so it can be copied to the clipboard. */
 export async function fetchReportMarkdown(findingId: string): Promise<string> {
   const res = await fetch(reportUrl(findingId, 'markdown'), {

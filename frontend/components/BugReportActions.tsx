@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { downloadReport, fetchReportMarkdown, reportUrl } from '../lib/api';
+import { downloadReport, fetchReportMarkdown, openReport } from '../lib/api';
 import type { Finding } from '../lib/types';
 
 /**
@@ -37,6 +37,18 @@ export function BugReportActions({ finding }: { finding: Finding }) {
     }
   };
 
+  const onOpen = async () => {
+    setBusy('open');
+    setError(null);
+    try {
+      await openReport(finding.id);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onCopy = async () => {
     setBusy('copy');
     setError(null);
@@ -60,14 +72,9 @@ export function BugReportActions({ finding }: { finding: Finding }) {
         <button className="btn btn-sm" onClick={onCopy} disabled={busy !== null}>
           {busy === 'copy' ? <span className="spinner" /> : '⧉'} Copy Markdown
         </button>
-        <a
-          className="btn btn-sm"
-          href={reportUrl(finding.id, 'html')}
-          target="_blank"
-          rel="noreferrer"
-        >
-          ↗ Open report
-        </a>
+        <button className="btn btn-sm" onClick={onOpen} disabled={busy !== null}>
+          {busy === 'open' ? <span className="spinner" /> : '↗'} Open report
+        </button>
         {!finding.bugKey && (
           <span className="faint">
             Confirm the finding to assign a permanent BUG id.
