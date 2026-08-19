@@ -1,0 +1,339 @@
+// ===========================================================================
+// DATA MODEL
+//
+// Lifecycle enforced by these tables:
+//   Project -> Run -> TestCase -> TestResult -> Finding -> FindingEvent
+//
+// Key design decisions:
+//  * steps/assertions are jsonb - the structured LLM output is stored raw.
+//  * a FAIL creates a Finding, never a "bug". A human moves the Finding to
+//    CONFIRMED / REJECTED, and may REOPEN it later. Full audit in FindingEvent.
+//  * every rejected LLM step is recorded in PolicyRejection so QA can see what
+//    the AI tried to do and why the backend refused it.
+// ===========================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enums ----
+
+enum RunStatus {
+  CREATED           // row exists, nothing started
+  SCANNING          // Playwright is reading the page
+  SCAN_FAILED       // page unreachable / blocked
+  PLANNING          // LLM is writing test cases
+  PLAN_FAILED       // LLM error, or every case rejected by policy
+  AWAITING_APPROVAL // QA must approve cases before execution
+  RUNNING           // Playwright is executing approved cases
+  COMPLETED         // execution finished (may still contain failures)
+}
+
+enum ResultStatus {
+  PASS
+  FAIL
+  FLAKY   // failed once, passed on the automatic rerun
+  ERROR   // could not run at all (locator missing, page crash, timeout)
+  SKIPPED
+}
+
+enum FindingStatus {
+  NEW       // just created by a failure, awaiting triage
+  TRIAGED   // AI classification reviewed, decision pending
+  CONFIRMED // QA says this is a real product defect
+  REJECTED  // QA says not a product defect (test / env / data issue)
+  REOPENED  // was closed, came back
+  CLOSED    // done
+}
+
+enum Classification {
+  PRODUCT_BUG
+  TEST_DEFECT
+  ENVIRONMENT_ISSUE
+  TEST_DATA_ISSUE
+  FLAKY
+  UNKNOWN
+}
+
+enum Severity {
+  S1_BLOCKER
+  S2_MAJOR
+  S3_MINOR
+  S4_TRIVIAL
+}
+
+enum CaseSource {
+  LLM    // proposed by the model
+  MANUAL // written or edited by a human
+}
+
+enum LogLevel {
+  ERROR
+  WARNING
+  INFO
+  DEBUG
+}
+
+// -------------------------------------------------------------- entities ----
+
+model Project {
+  id        String   @id @default(uuid())
+  name      String
+  baseUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  runs      Run[]
+
+  @@map("projects")
+}
+
+model Run {
+  id        String  @id @default(uuid())
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+
+  name         String
+  targetUrl    String
+  requirements String @db.Text
+
+  status        RunStatus @default(CREATED)
+  statusMessage String?   @db.Text
+
+  // Consent flags captured from the user before anything is opened.
+  authorized       Boolean @default(false)
+  allowDestructive Boolean @default(false)
+
+  // Raw page scan handed to the LLM (kept so QA can see what the AI saw).
+  pageSnapshot Json?
+
+  // Observability for the LLM call.
+  llmModel     String?
+  llmTokensIn  Int?
+  llmTokensOut Int?
+  llmLatencyMs Int?
+
+  createdAt     DateTime  @default(now())
+  scanStartedAt DateTime?
+  planStartedAt DateTime?
+  execStartedAt DateTime?
+  finishedAt    DateTime?
+
+  secret     RunSecret?
+  testCases  TestCase[]
+  results    TestResult[]
+  findings   Finding[]
+  rejections PolicyRejection[]
+
+  @@index([projectId, createdAt])
+  @@map("runs")
+}
+
+/// Encrypted test credentials. The plaintext never reaches the LLM - the model
+/// only ever sees a reference name such as "test_email".
+model RunSecret {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String @unique
+
+  /// AES-256-GCM payloads, format: iv:authTag:cipherText (all hex)
+  emailCipher    String?
+  passwordCipher String?
+
+  createdAt DateTime @default(now())
+
+  @@map("run_secrets")
+}
+
+model TestCase {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  title       String
+  priority    String     @default("P2") // P0..P3
+  source      CaseSource @default(LLM)
+  order       Int        @default(0)
+  tags        String[]   @default([])
+  rationale   String?    @db.Text // why the AI proposed this case
+  requirement String?    @db.Text // which requirement line it traces to
+
+  /// [{ action, target, valueRef?, value?, description }]
+  steps Json
+  /// [{ type, target?, value?, description }]
+  assertions Json
+
+  approved        Boolean   @default(false)
+  approvedAt      DateTime?
+  rejected        Boolean   @default(false)
+  rejectionReason String?   @db.Text
+  destructive     Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  results  TestResult[]
+  findings Finding[]
+
+  @@index([runId, order])
+  @@map("test_cases")
+}
+
+model TestResult {
+  id         String   @id @default(uuid())
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCaseId String
+
+  attempt Int          @default(1) // 2 = automatic rerun
+  status  ResultStatus
+
+  startedAt  DateTime
+  finishedAt DateTime
+  durationMs Int
+
+  // Failure detail - filled only when status is FAIL or ERROR.
+  failedStepIndex Int?
+  failedStepLabel String?
+  expected        String? @db.Text
+  actual          String? @db.Text
+  errorType       String? // LOCATOR_NOT_FOUND | ASSERTION_FAILED | TIMEOUT | NAVIGATION | PAGE_CRASH | UNKNOWN
+  errorMessage    String? @db.Text
+
+  // Environment recorded for every result (a QA report needs this).
+  browserName    String  @default("chromium")
+  browserVersion String?
+  viewport       String?
+  finalUrl       String?
+
+  /// [{ index, action, target, status, locatorStrategy, durationMs, message }]
+  stepResults Json
+
+  screenshotPath String?
+  tracePath      String?
+
+  consoleLogs ConsoleLog[]
+  networkLogs NetworkLog[]
+  finding     Finding?
+
+  @@index([runId])
+  @@index([testCaseId, attempt])
+  @@map("test_results")
+}
+
+/// Every browser console message captured during the run.
+model ConsoleLog {
+  id       String     @id @default(uuid())
+  result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String
+
+  level    LogLevel
+  message  String   @db.Text
+  location String?
+  at       DateTime @default(now())
+
+  @@index([resultId, level])
+  @@map("console_logs")
+}
+
+/// Every request the page made. isApiError marks 4xx/5xx on xhr/fetch calls -
+/// that is the "API error" list QA wants to see.
+model NetworkLog {
+  id       String     @id @default(uuid())
+  result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String
+
+  method       String
+  url          String   @db.Text
+  status       Int?
+  statusText   String?
+  resourceType String?
+  failureText  String?  @db.Text // set when the request never completed
+  durationMs   Int?
+  isApiError   Boolean  @default(false)
+  at           DateTime @default(now())
+
+  @@index([resultId, isApiError])
+  @@map("network_logs")
+}
+
+/// A failure awaiting human judgement. NOT a bug until a human confirms it.
+model Finding {
+  id         String     @id @default(uuid())
+  result     TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId   String     @unique
+  run        Run        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  testCase   TestCase   @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCaseId String
+
+  status   FindingStatus @default(NEW)
+  severity Severity?
+  assignee String?
+
+  /// Stable hash of (testCaseId + errorType + failed step + normalised message).
+  /// Same signature = same problem, so repeats update instead of duplicating.
+  signature String
+
+  // --- AI advisory fields. Suggestions only, never a verdict. ---
+  aiClassification Classification?
+  aiConfidence     Float?
+  aiSummary        String?         @db.Text
+  aiSuspectedCause String?         @db.Text
+  aiEvidence       Json?
+
+  // --- Human decision ---
+  humanClassification Classification?
+  triagedBy           String?
+  triagedAt           DateTime?
+  note                String?         @db.Text
+
+  occurrences Int      @default(1)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events FindingEvent[]
+
+  @@index([runId, status])
+  @@index([signature])
+  @@map("findings")
+}
+
+/// Append-only audit trail: who moved the finding, when, and why.
+model FindingEvent {
+  id        String  @id @default(uuid())
+  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId String
+
+  fromStatus FindingStatus?
+  toStatus   FindingStatus
+  actor      String         @default("qa@local")
+  note       String?        @db.Text
+  createdAt  DateTime       @default(now())
+
+  @@index([findingId, createdAt])
+  @@map("finding_events")
+}
+
+/// Anything the policy engine refused to execute, kept for transparency.
+model PolicyRejection {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  stage   String // LLM_SCHEMA | ACTION_NOT_ALLOWED | DESTRUCTIVE | URL_NOT_ALLOWED | LIMIT_EXCEEDED
+  subject String // case title or step description
+  reason  String @db.Text
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@map("policy_rejections")
+}

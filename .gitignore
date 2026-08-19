@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+# env — NEVER commit these, they hold the LLM key
+.env
+.env.local
+*.env.local
+# build output
+dist/
+.next/
+out/
+# generated prisma client
+backend/src/generated/
+# test evidence (screenshots / traces / videos)
+artifacts/
+!artifacts/.gitkeep
+# logs
+*.log
+npm-debug.log*
+# os
+.DS_Store
+Thumbs.db
+check-browser.png
+
+# SQLite database files (MVP local storage)
+*.db
+*.db-journal
+backend/prisma/*.db

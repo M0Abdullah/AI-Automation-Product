@@ -1,0 +1,464 @@
+// ===========================================================================
+// DATA MODEL — SQLite (MVP)
+//
+// Lifecycle enforced by these tables:
+//   Project -> Run -> TestCase -> TestResult -> Finding -> FindingEvent
+//
+// WHY SQLITE: zero install, one file on disk, good enough to prove the MVP.
+// The PostgreSQL version of this exact model is kept at
+// docs/schema.postgres.prisma — switching back is: change the datasource,
+// swap this file for that one, re-run migrate. Nothing else changes, because
+// all the SQLite-specific handling is isolated in src/common/db-json.ts.
+//
+// SQLITE LIMITATIONS AND HOW THEY ARE HANDLED
+//   * no enums        -> String columns, with the allowed values defined as
+//                        const objects in src/common/enums.ts
+//   * no String[]     -> comma-separated String, packed/unpacked by packTags()
+//   * no Json/jsonb   -> String holding JSON text, packed/unpacked by
+//                        packJson()/unpackJson()
+//   * no @db.Text     -> SQLite TEXT has no length limit anyway
+//
+// Every API response is hydrated back into real objects and arrays in
+// src/common/hydrate.ts, so the frontend never sees a JSON string.
+// ===========================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------------- entities ----
+
+model Project {
+  id        String   @id @default(uuid())
+  name      String
+  baseUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  runs      Run[]
+
+  @@map("projects")
+}
+
+model Run {
+  id        String  @id @default(uuid())
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+
+  name         String
+  targetUrl    String
+  requirements String
+
+  /// RunStatus — see src/common/enums.ts
+  status        String  @default("CREATED")
+  statusMessage String?
+
+  // Consent flags captured from the user before anything is opened.
+  authorized       Boolean @default(false)
+  allowDestructive Boolean @default(false)
+
+  /// JSON string: the PageSnapshot handed to the LLM. Kept so QA can see
+  /// exactly what the AI was shown.
+  pageSnapshot String?
+
+  // Observability for the LLM call.
+  llmModel     String?
+  llmTokensIn  Int?
+  llmTokensOut Int?
+  llmLatencyMs Int?
+
+  createdAt     DateTime  @default(now())
+  scanStartedAt DateTime?
+  planStartedAt DateTime?
+  execStartedAt DateTime?
+  finishedAt    DateTime?
+
+  createdBy   User?   @relation("runCreator", fields: [createdById], references: [id])
+  createdById String?
+
+  secret     RunSecret?
+  testCases  TestCase[]
+  results    TestResult[]
+  findings   Finding[]
+  rejections PolicyRejection[]
+
+  @@index([projectId, createdAt])
+  @@map("runs")
+}
+
+/// Encrypted test credentials. The plaintext never reaches the LLM — the model
+/// only ever sees a reference name such as "test_email".
+model RunSecret {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String @unique
+
+  /// AES-256-GCM payloads, format: iv:authTag:cipherText (all hex)
+  emailCipher    String?
+  passwordCipher String?
+
+  createdAt DateTime @default(now())
+
+  @@map("run_secrets")
+}
+
+model TestCase {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  title       String
+  priority    String  @default("P2") // P0..P3
+  /// CaseSource — LLM | MANUAL
+  source      String  @default("LLM")
+  order       Int     @default(0)
+  /// Comma-separated tags. packTags()/unpackTags() in src/common/db-json.ts
+  tags        String  @default("")
+  rationale   String? // why the AI proposed this case
+  requirement String? // which requirement line it traces to
+
+  /// JSON string: [{ action, target, valueRef?, value?, description }]
+  steps      String
+  /// JSON string: [{ type, target?, value?, description }]
+  assertions String
+
+  approved        Boolean   @default(false)
+  approvedAt      DateTime?
+  rejected        Boolean   @default(false)
+  rejectionReason String?
+  destructive     Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  results  TestResult[]
+  findings Finding[]
+
+  @@index([runId, order])
+  @@map("test_cases")
+}
+
+model TestResult {
+  id         String   @id @default(uuid())
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCaseId String
+
+  attempt Int    @default(1) // 2 = automatic rerun
+  /// ResultStatus — PASS | FAIL | FLAKY | ERROR | SKIPPED
+  status  String
+
+  startedAt  DateTime
+  finishedAt DateTime
+  durationMs Int
+
+  // Failure detail — filled only when status is FAIL or ERROR.
+  failedStepIndex Int?
+  failedStepLabel String?
+  expected        String?
+  actual          String?
+  /// ErrorType — LOCATOR_NOT_FOUND | ASSERTION_FAILED | TIMEOUT | NAVIGATION |
+  /// PAGE_CRASH | POLICY_BLOCKED | UNKNOWN
+  errorType       String?
+  errorMessage    String?
+
+  // Environment recorded for every result (a QA report needs this).
+  browserName    String  @default("chromium")
+  browserVersion String?
+  viewport       String?
+  finalUrl       String?
+
+  /// JSON string:
+  /// [{ index, action, target, status, locatorStrategy, durationMs, message }]
+  stepResults String
+
+  screenshotPath String?
+  tracePath      String?
+
+  consoleLogs ConsoleLog[]
+  networkLogs NetworkLog[]
+  finding     Finding?
+
+  @@index([runId])
+  @@index([testCaseId, attempt])
+  @@map("test_results")
+}
+
+/// Every browser console message captured during the run.
+model ConsoleLog {
+  id       String     @id @default(uuid())
+  result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String
+
+  /// LogLevel — ERROR | WARNING | INFO | DEBUG
+  level    String
+  message  String
+  location String?
+  at       DateTime @default(now())
+
+  @@index([resultId, level])
+  @@map("console_logs")
+}
+
+/// Every request the page made. isApiError marks 4xx/5xx on xhr/fetch calls —
+/// that is the "API error" list QA wants to see.
+model NetworkLog {
+  id       String     @id @default(uuid())
+  result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String
+
+  method       String
+  url          String
+  status       Int?
+  statusText   String?
+  resourceType String?
+  failureText  String? // set when the request never completed
+  durationMs   Int?
+  isApiError   Boolean  @default(false)
+  at           DateTime @default(now())
+
+  @@index([resultId, isApiError])
+  @@map("network_logs")
+}
+
+/// A failure awaiting human judgement. NOT a bug until a human confirms it.
+model Finding {
+  id         String     @id @default(uuid())
+  result     TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId   String     @unique
+  run        Run        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId      String
+  testCase   TestCase   @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCaseId String
+
+  /// FindingStatus — NEW | TRIAGED | CONFIRMED | REJECTED | REOPENED | CLOSED
+  status   String  @default("NEW")
+  /// Severity — S1_BLOCKER | S2_MAJOR | S3_MINOR | S4_TRIVIAL
+  severity String?
+  assignee String?
+
+  /// Stable hash of (testCaseId + errorType + failed step + normalised message).
+  /// Same signature = same problem, so repeats update instead of duplicating.
+  signature String
+
+  // --- AI advisory fields. Suggestions only, never a verdict. ---
+  /// Classification — see src/common/enums.ts
+  aiClassification String?
+  aiConfidence     Float?
+  aiSummary        String?
+  aiSuspectedCause String?
+  /// JSON string: { consoleErrors, apiErrors, attempts, evidenceUsed, ... }
+  aiEvidence       String?
+
+  // --- Human decision ---
+  humanClassification String?
+  triagedBy           String?
+  triagedAt           DateTime?
+  note                String?
+
+  // --- bug report identity (assigned when QA confirms it as a defect) ---
+  /// Human-readable id, e.g. BUG-001. Null until confirmed.
+  bugKey    String? @unique
+  bugNumber Int?    @unique
+  /// Which part of the product this defect lives in.
+  module    String?
+  /// Build / version / commit under test.
+  build     String?
+  /// How soon it must be fixed. Separate axis from severity (how bad it is).
+  priority  String?
+
+  occurrences Int      @default(1)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events FindingEvent[]
+  ticket Ticket?
+
+  @@index([runId, status])
+  @@index([signature])
+  @@map("findings")
+}
+
+/// Append-only audit trail: who moved the finding, when, and why.
+model FindingEvent {
+  id        String  @id @default(uuid())
+  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId String
+
+  fromStatus String?
+  toStatus   String
+  actor      String   @default("qa@local")
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([findingId, createdAt])
+  @@map("finding_events")
+}
+
+/// Anything the policy engine refused to execute, kept for transparency.
+model PolicyRejection {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  stage   String // LLM_SCHEMA | ACTION_NOT_ALLOWED | DESTRUCTIVE | ...
+  subject String
+  reason  String
+  /// JSON string: the offending step or assertion
+  payload String?
+
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@map("policy_rejections")
+}
+
+// ===========================================================================
+// AUTHENTICATION
+//
+// Real accounts, because "who confirmed this bug" and "who is this assigned to"
+// are core QA questions - they cannot be answered by a hardcoded "qa@local".
+// Passwords use scrypt (Node built-in): no native dependency, no npm risk.
+// ===========================================================================
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  /// Role - OWNER | QA | DEV | VIEWER (see src/common/enums.ts)
+  role         String    @default("QA")
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+
+  sessions        LoginSession[]
+  createdRuns     Run[]           @relation("runCreator")
+  assignedTickets Ticket[]        @relation("ticketAssignee")
+  reportedTickets Ticket[]        @relation("ticketReporter")
+  ticketComments  TicketComment[]
+
+  @@map("users")
+}
+
+/// One row per login. Doubles as the refresh-token store and the login history
+/// ("save user record of login") - who signed in, from where, and when.
+model LoginSession {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  /// SHA-256 of the refresh token. The raw token is never stored.
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId, createdAt])
+  @@map("login_sessions")
+}
+
+// ===========================================================================
+// TICKETS
+//
+// A ticket is created FROM a confirmed finding, prefilled with the evidence the
+// run already captured. The finding stays the QA record; the ticket is the
+// developer-facing work item with an assignee and a lifecycle.
+// ===========================================================================
+
+model Ticket {
+  id     String @id @default(uuid())
+  /// Human-readable key, e.g. TICKET-001. What people say out loud.
+  key    String @unique
+  number Int    @unique
+
+  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  findingId String  @unique
+
+  title       String
+  description String
+
+  /// TicketStatus - OPEN | IN_PROGRESS | READY_FOR_RETEST | RESOLVED | REOPENED | CLOSED
+  status   String    @default("OPEN")
+  /// Priority is a separate axis from severity: how soon vs how bad.
+  priority String    @default("P2")
+  severity String?
+  module   String?
+  build    String?
+  /// Comma-separated labels.
+  labels   String    @default("")
+  dueDate  DateTime?
+
+  assignee   User?   @relation("ticketAssignee", fields: [assigneeId], references: [id])
+  assigneeId String?
+  reporter   User?   @relation("ticketReporter", fields: [reporterId], references: [id])
+  reporterId String?
+
+  // --- external tracker (Jira / Linear / GitHub), filled by the connector ---
+  externalKey       String?
+  externalUrl       String?
+  externalProvider  String?
+  externalSyncedAt  DateTime?
+  /// Idempotency key so a double-click cannot create two Jira issues.
+  externalRequestId String?   @unique
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  resolvedAt DateTime?
+  closedAt   DateTime?
+
+  comments TicketComment[]
+  events   TicketEvent[]
+
+  @@index([status, priority])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id       String @id @default(uuid())
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+
+  author    User?    @relation(fields: [authorId], references: [id])
+  authorId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_comments")
+}
+
+/// Append-only audit trail for a ticket: every field change, with who and when.
+model TicketEvent {
+  id       String @id @default(uuid())
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+
+  field     String // status | assignee | priority | severity | comment | created
+  fromValue String?
+  toValue   String?
+  actor     String   @default("system")
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_events")
+}
+
+/// Atomic sequence generator for human-readable keys (BUG-001, TICKET-001).
+/// SQLite has no sequences, and counting rows races under concurrency.
+model Counter {
+  name  String @id
+  value Int    @default(0)
+
+  @@map("counters")
+}

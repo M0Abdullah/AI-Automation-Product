@@ -1,0 +1,30 @@
+# NOT NEEDED FOR THE MVP — the MVP runs on SQLite (backend/prisma/dev.db).
+#
+# This file is the upgrade path: when the MVP is approved and the project moves
+# to PostgreSQL, start this and follow "Moving to PostgreSQL" in the README.
+#
+# Starts ONLY the database. Backend + frontend run with npm on your machine.
+#   docker compose up -d
+#   docker compose down          (stop, keep data)
+#   docker compose down -v       (stop, delete data)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aitest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aitest
+      POSTGRES_PASSWORD: aitest
+      POSTGRES_DB: aitest
+    ports:
+      - '5432:5432'
+    volumes:
+      - aitest-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aitest -d aitest']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  aitest-pgdata:
