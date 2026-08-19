@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <div align="center">
 
 # AI Testing Platform
@@ -14,9 +15,61 @@ No test-writing skills needed. A human approves everything before it runs.
 ![Status](https://img.shields.io/badge/status-MVP-blue)
 
 </div>
+=======
+# AI Automation Product
 
----
+AI-powered test automation platform that converts application requirements into structured test cases and validates them using real browser automation.
 
+## 🚀 Overview
+
+Give the platform an authorized URL and requirements in plain English.
+
+The platform:
+
+1. Scans the application using Playwright
+2. Uses an LLM to generate structured test cases
+3. Validates test cases through a safety/policy layer
+4. Allows QA engineers to review and approve tests
+5. Executes approved tests in a real browser
+6. Captures screenshots, traces, logs, and network errors
+7. Generates findings and bug reports from failures
+
+> **Human approval is required before any generated test is executed.**
+
+## 🏗️ Architecture
+
+```text
+Requirements
+     ↓
+Page Scanner
+     ↓
+AI Test Case Generation
+     ↓
+Policy & Schema Validation
+     ↓
+Human Review & Approval
+     ↓
+Playwright Browser Execution
+     ↓
+Results & Evidence
+     ↓
+Findings / Bug Reports
+```
+
+## 🛠️ Tech Stack
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
+
+| Layer              | Technology                           |
+| ------------------ | ------------------------------------ |
+| Frontend           | Next.js 15, TypeScript, Tailwind CSS |
+| Backend            | NestJS 11, TypeScript                |
+| Database           | SQLite + Prisma                      |
+| Browser Automation | Playwright                           |
+| LLM                | Groq / OpenAI-compatible API         |
+| Authentication     | JWT + scrypt                         |
+| Infrastructure     | Docker                               |
+
+<<<<<<< HEAD
 ## What it is
 
 A web app that **tests other websites for you**.
@@ -46,9 +99,27 @@ Every failure is a **finding**, not a bug. You decide if it's real. Only then do
 ```
 
 **Three parts, three jobs.** The AI decides *what* to test. The backend validates and stores. Chrome does the clicking and decides PASS/FAIL. The AI never touches the browser and never decides whether a test passed.
+=======
+## ✨ Key Features
 
----
+* AI-generated test cases from plain-English requirements
+* Real browser execution with Playwright
+* Human approval before test execution
+* Deterministic PASS / FAIL assertions
+* Screenshots and Playwright traces
+* Console and API error detection
+* Failure reproducibility checks
+* AI-assisted failure classification
+* QA finding and triage workflow
+* Bug report generation
+* Ticket management
+* Role-based authentication
+* Audit trail for QA decisions
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
 
+## 📁 Project Structure
+
+<<<<<<< HEAD
 ## Screenshots
 
 ### 1. Start a test — tick boxes, don't write code
@@ -140,10 +211,34 @@ The AI is **forbidden** from asserting anything you didn't write. That's what st
 ## Quick start
 
 **Requirements:** Node 20+, and Google Chrome installed (falls back to bundled Chromium).
+=======
+```text
+AI-Automation-Product/
+├── backend/          # NestJS API + Playwright automation
+├── frontend/         # Next.js dashboard
+├── docs/             # Architecture, API and database documentation
+├── artifacts/        # Screenshots and traces (gitignored)
+├── docker-compose.yml
+└── README.md
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+* Node.js 18+
+* npm
+* Playwright
+* Docker (optional)
+* LLM API key
+
+### Backend
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
 
 ```bash
 # 1. Backend
 cd backend
+<<<<<<< HEAD
 cp .env.example .env          # then add your LLM key (see below)
 npm install
 npx prisma migrate dev
@@ -151,9 +246,30 @@ npx playwright install chromium
 npm run start:dev             # http://localhost:4000
 
 # 2. Frontend  (second terminal)
-cd frontend
-cp .env.local.example .env.local
+=======
 npm install
+
+cp .env.example .env
+
+npx prisma migrate dev --name init
+npx playwright install chromium
+
+npm run start:dev
+```
+
+Backend:
+
+```text
+http://localhost:4000/api
+```
+
+### Frontend
+
+```bash
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
+cd frontend
+npm install
+<<<<<<< HEAD
 npm run dev                   # http://localhost:3000
 ```
 
@@ -200,9 +316,70 @@ npm run check:browser -- https://your-site.com/login
 | `npx prisma studio` | Browse the database in a GUI |
 
 </details>
+=======
 
----
+cp .env.local.example .env.local
 
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+## 🔑 Environment Variables
+
+Configure the required values in:
+
+```text
+backend/.env
+```
+
+Example:
+
+```env
+LLM_API_KEY=your_api_key
+LLM_MODEL=your_model
+JWT_SECRET=your_secret
+DATABASE_URL=file:./dev.db
+```
+
+Never commit `.env` or API keys to the repository.
+
+## 🧪 Test Workflow
+
+A typical workflow is:
+
+```text
+1. Enter application URL
+2. Enter requirements
+3. Confirm authorization
+4. Scan application
+5. Generate test cases
+6. Review / edit / approve tests
+7. Execute approved tests
+8. Review results
+9. Investigate failures
+10. Confirm or reject findings
+11. Generate bug report
+```
+
+## 🔐 Safety
+
+The platform uses multiple safety layers:
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
+
+* The LLM does not directly control the browser
+* Generated actions are schema validated
+* Only approved actions/assertions are allowed
+* Tests are restricted to the authorized origin
+* Destructive actions are controlled by policy
+* Human approval is required before execution
+* Test credentials are encrypted and never sent to the LLM
+
+<<<<<<< HEAD
 ## Try it in 60 seconds
 
 Use a public practice site — nothing can break:
@@ -217,9 +394,55 @@ Use a public practice site — nothing can break:
 Leave the default checks ticked, add the credentials, tick the two **Login** checks, and press go.
 
 **Verified result: 8 tests generated, 6 pass, 2 fail.** Both failures are correct — the practice site loads a third-party analytics beacon that fails DNS, so `no console errors` and `no broken API calls` legitimately fail. The AI classifies it as an **environment issue**, not a bug in the app.
+=======
+## 📊 Failure Handling
 
----
+A failed test is treated as a **finding**, not automatically as a product bug.
 
+```text
+Test Failure
+     ↓
+Clean Rerun
+     ↓
+Flaky? ── Yes → FLAKY
+     │
+     No
+     ↓
+Finding Created
+     ↓
+Human Triage
+     ↓
+┌───────────────┐
+│ Confirm       │ → Product Bug
+│ Reject        │ → Test / Environment / Data Issue
+└───────────────┘
+```
+
+## 📚 Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+* `docs/ARCHITECTURE.md` — system architecture
+* `docs/API.md` — API reference
+* `docs/schema.postgres.prisma` — PostgreSQL schema
+
+## 🚧 MVP Limitations
+
+The current MVP intentionally does not include:
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
+
+* Multi-tenancy
+* Redis/job queues
+* Electron desktop client
+* Firefox/WebKit/mobile emulation
+* Live Jira API integration
+* Scheduled reports
+* Visual regression testing
+* Full application crawling
+* Automatic test healing
+* CI integration
+
+<<<<<<< HEAD
 ## Why you can trust the results
 
 Most AI testing tools drown you in false alarms. Three design decisions stop that:
@@ -416,3 +639,22 @@ SQLite keeps the MVP install-free. Everything SQLite-specific is isolated in two
 Not *"enter any URL and AI finds every bug."* That claim doesn't survive contact with a real app.
 
 </div>
+=======
+These can be added in future iterations.
+
+## 📌 Project Status
+
+**Status:** MVP / Active Development
+
+The current focus is validating the core AI → test generation → human approval → browser execution → evidence → QA workflow.
+
+## 🤝 Contributing
+
+Contributions, suggestions, and improvements are welcome.
+
+Please open an issue or submit a pull request.
+
+## 📄 License
+
+This project is currently intended for development and evaluation purposes.
+>>>>>>> d01bc21529aa550e5e0a3bd9b2921350679344f1
