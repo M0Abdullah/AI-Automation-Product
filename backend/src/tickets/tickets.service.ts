@@ -125,9 +125,29 @@ export class TicketsService {
     return ticket;
   }
 
-  findAll(filter: { status?: string; assigneeId?: string }) {
+  findAll(filter: {
+    status?: string;
+    assigneeId?: string;
+    scope?: 'mine' | 'team';
+    userId?: string;
+  }) {
     return this.prisma.ticket.findMany({
-      where: { status: filter.status, assigneeId: filter.assigneeId },
+      where: {
+        status: filter.status,
+        assigneeId: filter.assigneeId,
+        // "Mine" means: raised from my run, assigned to me, or reported by me.
+        // A ticket assigned to you must stay visible even if someone else
+        // started the run that found it.
+        ...(filter.scope === 'mine' && filter.userId
+          ? {
+              OR: [
+                { finding: { run: { createdById: filter.userId } } },
+                { assigneeId: filter.userId },
+                { reporterId: filter.userId },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 200,
       include: TICKET_INCLUDE,
@@ -308,9 +328,22 @@ export class TicketsService {
     return updated;
   }
 
-  /** Board counts for the tickets screen. */
-  async stats() {
-    const grouped = await this.prisma.ticket.groupBy({ by: ['status'], _count: true });
+  /** Board counts, scoped the same way as the list. */
+  async stats(scope: 'mine' | 'team', userId: string) {
+    const grouped = await this.prisma.ticket.groupBy({
+      by: ['status'],
+      where:
+        scope === 'mine'
+          ? {
+              OR: [
+                { finding: { run: { createdById: userId } } },
+                { assigneeId: userId },
+                { reporterId: userId },
+              ],
+            }
+          : {},
+      _count: true,
+    });
     const out: Record<string, number> = {
       OPEN: 0,
       IN_PROGRESS: 0,
@@ -361,6 +394,18 @@ const TICKET_INCLUDE = {
       occurrences: true,
       runId: true,
       testCaseId: true,
+      // The ticket page shows the failure screenshot, so the paths travel with
+      // the ticket rather than needing a second request.
+      result: {
+        select: {
+          id: true,
+          screenshotPath: true,
+          tracePath: true,
+          browserName: true,
+          viewport: true,
+          attempt: true,
+        },
+      },
     },
   },
 } as const;

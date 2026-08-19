@@ -6,6 +6,14 @@ import { useEffect, useState } from 'react';
 import { getFindingStats, getHealth, getTicketStats } from '../lib/api';
 import { ROLE_LABEL } from '../lib/auth';
 import { useAuth } from './AuthProvider';
+import {
+  IconAlert,
+  IconBug,
+  IconDashboard,
+  IconHistory,
+  IconPlus,
+  IconSettings,
+} from './Icons';
 
 /**
  * The application frame: sidebar navigation, top bar, health indicator.
@@ -15,12 +23,60 @@ import { useAuth } from './AuthProvider';
  * a signed-out visitor.
  */
 
+/**
+ * Navigation, in plain English.
+ *
+ * "Triage inbox" was jargon — nobody outside QA knows what triage means, and it
+ * did not say what the screen contains. Every label here names the THING you
+ * find on the page, and the section headers say when you use it.
+ */
 const NAV = [
-  { href: '/', label: 'New run', icon: '＋', exact: true },
-  { href: '/runs', label: 'Test runs', icon: '▶' },
-  { href: '/findings', label: 'Triage inbox', icon: '⚑', counter: 'findings' as const },
-  { href: '/tickets', label: 'Tickets', icon: '☰', counter: 'tickets' as const },
-  { href: '/account', label: 'Account', icon: '○' },
+  {
+    href: '/',
+    label: 'Overview',
+    hint: 'Your numbers at a glance',
+    Icon: IconDashboard,
+    exact: true,
+    group: 'Testing',
+  },
+  {
+    href: '/runs/new',
+    label: 'Test a page',
+    hint: 'Paste a URL and start',
+    Icon: IconPlus,
+    exact: true,
+    group: 'Testing',
+  },
+  {
+    href: '/runs',
+    label: 'Past tests',
+    hint: 'Everything you have run',
+    Icon: IconHistory,
+    group: 'Testing',
+  },
+  {
+    href: '/findings',
+    label: 'Failures',
+    hint: 'Decide: real bug or not',
+    Icon: IconAlert,
+    counter: 'findings' as const,
+    group: 'Bugs',
+  },
+  {
+    href: '/tickets',
+    label: 'Bug tickets',
+    hint: 'Assigned to developers',
+    Icon: IconBug,
+    counter: 'tickets' as const,
+    group: 'Bugs',
+  },
+  {
+    href: '/account',
+    label: 'Settings',
+    hint: 'Your account and team',
+    Icon: IconSettings,
+    group: 'You',
+  },
 ];
 
 const AUTH_PATHS = ['/login', '/register'];
@@ -69,9 +125,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const current = NAV.find((n) =>
-    n.exact ? pathname === n.href : pathname.startsWith(n.href) && n.href !== '/',
-  );
+  // Longest href first, so /runs/new wins over /runs.
+  const current = [...NAV]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((n) => (n.exact ? pathname === n.href : pathname.startsWith(n.href)));
 
   return (
     <div className="shell">
@@ -81,20 +138,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span>Testing Platform</span>
         </Link>
 
-        <div className="nav-label">Workspace</div>
-        {NAV.map((item) => {
-          const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+        {NAV.map((item, i) => {
+          const active = current?.href === item.href;
           const count = item.counter ? counts[item.counter] : 0;
+          const newGroup = i === 0 || NAV[i - 1].group !== item.group;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`nav-item ${active ? 'nav-item-active' : ''}`}
-            >
-              <span className="nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-              {count > 0 && <span className="nav-count">{count}</span>}
-            </Link>
+            <div key={item.href}>
+              {newGroup && <div className="nav-label">{item.group}</div>}
+              <Link
+                href={item.href}
+                className={`nav-item ${active ? 'nav-item-active' : ''}`}
+                title={item.hint}
+              >
+                <span className="nav-icon">
+                  <item.Icon size={17} />
+                </span>
+                <span>{item.label}</span>
+                {count > 0 && <span className="nav-count">{count}</span>}
+              </Link>
+            </div>
           );
         })}
 
@@ -106,7 +168,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="main">
         <div className="topbar">
           <span className="topbar-title">{current?.label ?? 'Test run'}</span>
+          {current?.hint && <span className="faint">{current.hint}</span>}
           <div className="spacer" />
+          {/* Signed-in identity is shown here as well as the sidebar: seeing data
+              that belongs to a different account is confusing, so the account is
+              always on screen. */}
+          <span className="pill">
+            {user.email} · {ROLE_LABEL[user.role]}
+          </span>
           <HealthDot />
         </div>
         <div className="content">{children}</div>

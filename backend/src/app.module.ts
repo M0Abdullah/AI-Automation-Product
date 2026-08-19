@@ -4,6 +4,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/auth.guard';
 import { BrowserModule } from './browser/browser.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { CounterService } from './common/counter.service';
 import { SystemController } from './common/system.controller';
 import { AppConfigModule } from './config/config.module';
@@ -42,6 +43,7 @@ import { TicketsModule } from './tickets/tickets.module';
     BrowserModule,
     PolicyModule,
     // product
+    DashboardModule,
     ProjectsModule,
     RunsModule,
     TestCasesModule,

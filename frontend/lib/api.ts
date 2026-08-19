@@ -1,5 +1,7 @@
 import { tokenStore, type AuthUser } from './auth';
 import type {
+  CheckOption,
+  DashboardOverview,
   Finding,
   FindingStatus,
   LoginSession,
@@ -127,7 +129,12 @@ export const getHealth = () =>
   }>('/health');
 
 export const getCapabilities = () =>
-  request<{ actions: string[]; assertions: string[]; valueRefs: string[] }>('/capabilities');
+  request<{
+    actions: string[];
+    assertions: string[];
+    valueRefs: string[];
+    checks: CheckOption[];
+  }>('/capabilities');
 
 // -------------------------------------------------------------------- auth
 
@@ -156,11 +163,18 @@ export const getLoginHistory = () => request<LoginSession[]>('/auth/sessions');
 
 export const getTeam = () => request<TeamMember[]>('/auth/users');
 
+// --------------------------------------------------------------- dashboard
+
+export const getDashboard = () => request<DashboardOverview>('/dashboard');
+
 // -------------------------------------------------------------------- runs
 
 export interface CreateRunInput {
   url: string;
-  requirements: string;
+  /** Optional now: ticked checks alone are a valid run. */
+  requirements?: string;
+  /** Ids from the check catalogue. */
+  checks?: string[];
   name?: string;
   credentials?: { email?: string; password?: string };
   authorized: boolean;

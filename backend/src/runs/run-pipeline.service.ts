@@ -4,7 +4,8 @@ import * as crypto from 'node:crypto';
 import { PageScannerService } from '../browser/page-scanner.service';
 import { TestExecutorService } from '../browser/test-executor.service';
 import type { ExecutionOutcome } from '../browser/browser.types';
-import { packJson, packJsonNullable, packTags, unpackJson } from '../common/db-json';
+import { resolveChecks } from '../common/check-catalog';
+import { packJson, packJsonNullable, packTags, unpackJson, unpackTags } from '../common/db-json';
 import { Classification, ResultStatus, RunStatus } from '../common/enums';
 import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
@@ -125,6 +126,11 @@ export class RunPipelineService {
         requirements: run.requirements,
         snapshot,
         hasCredentials,
+        // Credential-dependent checks are dropped when no credentials exist, so
+        // the model is never asked to log in with nothing.
+        checks: resolveChecks(unpackTags(run.checks)).filter(
+          (c) => !c.requiresCredentials || hasCredentials,
+        ),
       });
     } catch (err) {
       await this.fail(
@@ -245,14 +251,11 @@ export class RunPipelineService {
       return;
     }
 
+    // RunsService.execute already committed RUNNING and execStartedAt so the UI
+    // starts polling immediately. Here we only report progress.
     await this.prisma.run.update({
       where: { id: runId },
-      data: {
-        status: RunStatus.RUNNING,
-        execStartedAt: new Date(),
-        finishedAt: null,
-        statusMessage: `Running ${run.testCases.length} test case(s)`,
-      },
+      data: { statusMessage: `Running ${run.testCases.length} test case(s)` },
     });
 
     const values = this.secrets.buildRuntimeValues(run.secret);

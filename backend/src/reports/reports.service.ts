@@ -110,11 +110,15 @@ export class ReportsService {
           : `${n.method} ${n.url} -> ${n.status} ${n.statusText ?? ''}`.trim(),
       );
 
+    // PDF/HTML inline the image as a data URI so the file is self-contained.
+    // Markdown gets an ABSOLUTE url, because it will be pasted somewhere else
+    // where a relative path is a broken image.
+    const base = this.config.publicApiUrl;
     let screenshotUrl: string | null = null;
     if (r.screenshotPath) {
       screenshotUrl = opts.inlineScreenshot
         ? await this.inlineScreenshot(r.screenshotPath)
-        : `/api/artifacts/${r.screenshotPath}`;
+        : `${base}/api/artifacts/${r.screenshotPath}`;
     }
 
     return {
@@ -164,7 +168,7 @@ export class ReportsService {
       consoleErrors: consoleErrors.length ? consoleErrors : (evidence.consoleErrors ?? []),
       apiErrors: apiErrors.length ? apiErrors : (evidence.apiErrors ?? []),
       screenshotUrl,
-      traceUrl: r.tracePath ? `/api/artifacts/${r.tracePath}` : null,
+      traceUrl: r.tracePath ? `${base}/api/artifacts/${r.tracePath}` : null,
       ticket: finding.ticket,
     };
   }

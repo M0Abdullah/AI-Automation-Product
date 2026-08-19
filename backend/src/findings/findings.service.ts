@@ -36,11 +36,20 @@ export class FindingsService {
     private readonly counters: CounterService,
   ) {}
 
-  async findAll(filter: { status?: string; runId?: string }) {
+  async findAll(filter: {
+    status?: string;
+    runId?: string;
+    scope?: 'mine' | 'team';
+    userId?: string;
+  }) {
     const rows = await this.prisma.finding.findMany({
       where: {
         status: filter.status,
         runId: filter.runId,
+        // Findings inherit the visibility of the run that produced them.
+        ...(filter.scope === 'mine' && filter.userId
+          ? { run: { createdById: filter.userId } }
+          : {}),
       },
       orderBy: [{ status: 'asc' }, { lastSeenAt: 'desc' }],
       take: 200,
@@ -61,9 +70,11 @@ export class FindingsService {
             expected: true,
             actual: true,
             screenshotPath: true,
+            tracePath: true,
             finalUrl: true,
             browserName: true,
             viewport: true,
+            attempt: true,
             startedAt: true,
           },
         },
@@ -192,9 +203,13 @@ export class FindingsService {
     return this.findOne(id);
   }
 
-  /** Counts for the triage inbox badges. */
-  async stats() {
-    const grouped = await this.prisma.finding.groupBy({ by: ['status'], _count: true });
+  /** Counts for the inbox badges, scoped the same way as the list. */
+  async stats(scope: 'mine' | 'team', userId: string) {
+    const grouped = await this.prisma.finding.groupBy({
+      by: ['status'],
+      where: scope === 'mine' ? { run: { createdById: userId } } : {},
+      _count: true,
+    });
     const out: Record<string, number> = {
       NEW: 0,
       TRIAGED: 0,

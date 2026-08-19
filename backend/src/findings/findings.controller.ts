@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { RequireWrite } from '../auth/auth.guard';
+import { CurrentUser, RequireWrite } from '../auth/auth.guard';
+import type { JwtPayload } from '../auth/auth.service';
 import { FindingStatus } from '../common/enums';
 import { FindingNoteDto, TriageFindingDto } from './dto/triage.dto';
 import { FindingsService } from './findings.service';
@@ -10,18 +11,28 @@ export class FindingsController {
 
   /** GET /api/findings?status=NEW - the triage inbox. */
   @Get()
-  findAll(@Query('status') status?: string, @Query('runId') runId?: string) {
+  findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query('status') status?: string,
+    @Query('runId') runId?: string,
+    @Query('scope') scope?: string,
+  ) {
     if (status && !(status in FindingStatus)) {
       throw new BadRequestException(
         `Unknown status "${status}". Valid: ${Object.keys(FindingStatus).join(', ')}`,
       );
     }
-    return this.findings.findAll({ status, runId });
+    return this.findings.findAll({
+      status,
+      runId,
+      scope: scope === 'team' ? 'team' : 'mine',
+      userId: user.sub,
+    });
   }
 
   @Get('stats')
-  stats() {
-    return this.findings.stats();
+  stats(@CurrentUser() user: JwtPayload, @Query('scope') scope?: string) {
+    return this.findings.stats(scope === 'team' ? 'team' : 'mine', user.sub);
   }
 
   /** GET /api/findings/:id - the full bug report with all evidence. */

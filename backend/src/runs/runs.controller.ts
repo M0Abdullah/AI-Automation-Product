@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { RequireWrite } from '../auth/auth.guard';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { CurrentUser, RequireWrite } from '../auth/auth.guard';
+import type { JwtPayload } from '../auth/auth.service';
 import { CreateRunDto } from './dto/create-run.dto';
 import { RunsService } from './runs.service';
 
@@ -10,13 +11,14 @@ export class RunsController {
   /** POST /api/runs - the only thing the user has to fill in. */
   @RequireWrite()
   @Post()
-  create(@Body() dto: CreateRunDto) {
-    return this.runs.create(dto);
+  create(@Body() dto: CreateRunDto, @CurrentUser() user: JwtPayload) {
+    return this.runs.create(dto, user.sub);
   }
 
+  /** GET /api/runs?scope=mine|team — defaults to your own runs. */
   @Get()
-  findAll() {
-    return this.runs.findAll();
+  findAll(@CurrentUser() user: JwtPayload, @Query('scope') scope?: string) {
+    return this.runs.findAll(scope === 'team' ? 'team' : 'mine', user.sub);
   }
 
   /** GET /api/runs/:id - everything the run page renders, in one call. */

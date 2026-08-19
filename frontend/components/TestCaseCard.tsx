@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from './AuthProvider';
 import {
   ApiError,
   approveTestCase,
@@ -10,18 +9,20 @@ import {
   updateTestCase,
 } from '../lib/api';
 import type { TestCase } from '../lib/types';
+import { useAuth } from './AuthProvider';
 import { ResultEvidence } from './ResultEvidence';
 import { PriorityBadge, ResultStatusBadge } from './StatusBadge';
 import { PlannedSteps } from './StepTimeline';
 
 /**
- * PHASE D: THE HUMAN GATE.
+ * ONE TEST, AS ONE LINE.
  *
- * One proposed test case, with everything a reviewer needs: what it will do,
- * what it asserts, which requirement it traces to, and Approve / Reject / Edit.
+ * This card used to open with every step, every assertion and a paragraph of
+ * rationale — eight of them made a page nobody could scan. Now it shows a single
+ * plain-English summary and hides the detail until asked.
  *
- * Edits are sent back through the same policy validation as the AI's output, so
- * an invalid edit is refused with a readable reason rather than silently saved.
+ * The detail is one click away, never removed: a reviewer approving a machine's
+ * test must always be able to see exactly what it will do.
  */
 export function TestCaseCard({
   testCase,
@@ -34,6 +35,7 @@ export function TestCaseCard({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [details, setDetails] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showEvidence, setShowEvidence] = useState(false);
 
@@ -45,6 +47,7 @@ export function TestCaseCard({
   );
 
   const latest = testCase.results.length ? testCase.results[testCase.results.length - 1] : null;
+  const failed = latest && latest.status !== 'PASS';
 
   const act = async (label: string, fn: () => Promise<unknown>) => {
     setBusy(label);
@@ -81,60 +84,61 @@ export function TestCaseCard({
       setEditing(false);
     });
 
+  const accent = failed
+    ? 'var(--fail)'
+    : latest
+      ? 'var(--pass)'
+      : testCase.rejected
+        ? 'var(--neutral)'
+        : testCase.approved
+          ? 'var(--brand)'
+          : 'var(--warn)';
+
   return (
     <div
-      className="card"
+      className="card card-tight"
       style={{
-        borderLeftWidth: 3,
-        borderLeftStyle: 'solid',
-        borderLeftColor: testCase.rejected
-          ? 'var(--neutral)'
-          : testCase.approved
-            ? 'var(--pass)'
-            : 'var(--warn)',
-        opacity: testCase.rejected ? 0.65 : 1,
+        borderLeft: `3px solid ${accent}`,
+        opacity: testCase.rejected ? 0.6 : 1,
       }}
     >
-      <div className="card-head">
-        <div style={{ minWidth: 0 }}>
-          <div className="row">
-            <PriorityBadge priority={testCase.priority} />
-            {editing ? (
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                style={{ maxWidth: 420 }}
-              />
-            ) : (
-              <strong>{testCase.title}</strong>
-            )}
-            {testCase.source === 'MANUAL' && <span className="pill">edited by human</span>}
-            {testCase.destructive && <span className="badge badge-fail">destructive</span>}
-            {testCase.approved && <span className="badge badge-pass">approved</span>}
-            {testCase.rejected && <span className="badge badge-neutral">rejected</span>}
-            {latest && <ResultStatusBadge status={latest.status} />}
-          </div>
+      {/* ------------------------------------------------------- the one line */}
+      <div className="spread" style={{ gap: 10 }}>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            font: 'inherit',
+            color: 'inherit',
+            cursor: 'pointer',
+            textAlign: 'left',
+            minWidth: 0,
+            flex: 1,
+          }}
+          title={open ? 'Hide the detail' : 'Show what this test does'}
+        >
+          <span className="faint" style={{ width: 10, flexShrink: 0 }}>
+            {open ? '▾' : '▸'}
+          </span>
+          <PriorityBadge priority={testCase.priority} />
+          <span style={{ fontWeight: 570, minWidth: 0 }}>{testCase.title}</span>
+          {latest && <ResultStatusBadge status={latest.status} />}
+          {!latest && testCase.approved && <span className="badge badge-brand">approved</span>}
+          {!latest && !testCase.approved && !testCase.rejected && (
+            <span className="badge badge-warn">needs review</span>
+          )}
+          {testCase.rejected && <span className="badge badge-neutral">skipped</span>}
+          {testCase.destructive && <span className="badge badge-fail">risky</span>}
+        </button>
 
-          {testCase.requirement && (
-            <div className="faint" style={{ marginTop: 4 }}>
-              Requirement: {testCase.requirement}
-            </div>
-          )}
-          {testCase.rationale && (
-            <div className="faint" style={{ marginTop: 2 }}>
-              Why: {testCase.rationale}
-            </div>
-          )}
-          {testCase.rejectionReason && (
-            <div className="faint" style={{ marginTop: 2 }}>
-              Rejected: {testCase.rejectionReason}
-            </div>
-          )}
-        </div>
-
-        <div className="row">
-          {!testCase.approved && !testCase.rejected && canWrite && (
+        <div className="row" style={{ gap: 6 }}>
+          {canWrite && !testCase.approved && !testCase.rejected && (
             <button
               className="btn btn-sm btn-primary"
               disabled={busy !== null}
@@ -143,23 +147,24 @@ export function TestCaseCard({
               {busy === 'approve' ? <span className="spinner" /> : null} Approve
             </button>
           )}
-          {!testCase.rejected && canWrite && (
+          {canWrite && !testCase.rejected && (
             <button
-              className="btn btn-sm btn-danger"
+              className="btn btn-sm btn-ghost"
               disabled={busy !== null}
               onClick={() =>
                 act('reject', () =>
                   rejectTestCase(
                     testCase.id,
-                    window.prompt('Why are you rejecting this test case?') ?? undefined,
+                    window.prompt('Why are you skipping this test?') ?? undefined,
                   ),
                 )
               }
+              title="Do not run this test"
             >
-              Reject
+              Skip
             </button>
           )}
-          {testCase.rejected && canWrite && (
+          {canWrite && testCase.rejected && (
             <button
               className="btn btn-sm"
               disabled={busy !== null}
@@ -168,28 +173,31 @@ export function TestCaseCard({
               Restore
             </button>
           )}
-          <button
-            className="btn btn-sm"
-            disabled={busy !== null}
-            onClick={() => setEditing((v) => !v)}
-          >
-            {editing ? 'Cancel edit' : 'Edit'}
-          </button>
           {latest && (
             <button
-              className="btn btn-sm"
+              className="btn btn-sm btn-ghost"
               disabled={busy !== null}
               onClick={() => act('retest', () => retestTestCase(testCase.id))}
-              title="Re-run just this test - use after a developer says it is fixed"
+              title="Run just this one test again"
             >
-              {busy === 'retest' ? <span className="spinner" /> : null} Retest
+              {busy === 'retest' ? <span className="spinner" /> : null} Retry
             </button>
           )}
         </div>
       </div>
 
+      {/* ------------------------ the failure reason, always visible if failed */}
+      {failed && latest?.errorMessage && (
+        <div
+          className="faint"
+          style={{ marginTop: 8, marginLeft: 19, color: 'var(--fail)', lineHeight: 1.5 }}
+        >
+          {latest.errorMessage.slice(0, 220)}
+        </div>
+      )}
+
       {error && (
-        <div className="banner banner-error" style={{ marginBottom: 10 }}>
+        <div className="banner banner-error" style={{ marginTop: 10 }}>
           <div>
             <strong>{error}</strong>
             {details.length > 0 && (
@@ -203,74 +211,86 @@ export function TestCaseCard({
         </div>
       )}
 
-      {editing ? (
-        <div className="stack">
-          <label className="field" style={{ marginBottom: 0 }}>
-            <span className="field-label">Priority</span>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <option value="P0">P0 - blocker</option>
-              <option value="P1">P1 - high</option>
-              <option value="P2">P2 - medium</option>
-              <option value="P3">P3 - low</option>
-            </select>
-          </label>
-          <label className="field" style={{ marginBottom: 0 }}>
-            <span className="field-label">Steps (JSON)</span>
-            <span className="field-hint">
-              Allowed actions: goto, click, fill, select, check, uncheck, press, hover, waitForUrl,
-              waitForVisible. Use valueRef for credentials.
-            </span>
-            <textarea rows={10} value={stepsJson} onChange={(e) => setStepsJson(e.target.value)} />
-          </label>
-          <label className="field" style={{ marginBottom: 0 }}>
-            <span className="field-label">Assertions (JSON)</span>
-            <span className="field-hint">
-              Allowed: urlContains, urlNotContains, visible, notVisible, textContains,
-              textNotContains, valueEquals, titleContains, elementCountAtLeast, noConsoleErrors,
-              noApiErrors.
-            </span>
-            <textarea
-              rows={8}
-              value={assertionsJson}
-              onChange={(e) => setAssertionsJson(e.target.value)}
-            />
-          </label>
-          <div className="row">
-            <button className="btn btn-primary btn-sm" disabled={busy !== null} onClick={save}>
-              {busy === 'save' ? <span className="spinner" /> : null} Save and re-validate
-            </button>
-            <span className="faint">
-              Your edit goes through the same policy checks as the AI&apos;s output.
-            </span>
-          </div>
-        </div>
-      ) : (
-        <details className="collapse" open={!latest}>
-          <summary>
-            {testCase.steps.length} steps, {testCase.assertions.length} assertions
-          </summary>
-          <PlannedSteps steps={testCase.steps} assertions={testCase.assertions} />
-        </details>
-      )}
-
-      {testCase.results.length > 0 && (
-        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-          <div className="spread">
-            <div className="row">
-              {testCase.results.map((r) => (
-                <span key={r.id} className="row" style={{ gap: 4 }}>
-                  <span className="faint">attempt {r.attempt}:</span>
-                  <ResultStatusBadge status={r.status} />
-                </span>
-              ))}
+      {/* ------------------------------------------------------- the detail */}
+      {open && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          {testCase.requirement && (
+            <div className="faint" style={{ marginBottom: 10 }}>
+              Checks: {testCase.requirement}
             </div>
-            <button className="btn btn-sm btn-ghost" onClick={() => setShowEvidence((v) => !v)}>
-              {showEvidence ? 'Hide evidence' : 'View evidence'}
-            </button>
-          </div>
+          )}
+          {testCase.rejectionReason && (
+            <div className="faint" style={{ marginBottom: 10 }}>
+              Skipped because: {testCase.rejectionReason}
+            </div>
+          )}
+
+          {editing ? (
+            <div className="stack-sm">
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">Title</span>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">Priority</span>
+                <select value={priority} onChange={(e) => setPriority(e.target.value)}>
+                  <option value="P0">P0 — blocks release</option>
+                  <option value="P1">P1 — important</option>
+                  <option value="P2">P2 — normal</option>
+                  <option value="P3">P3 — minor</option>
+                </select>
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">What it does (JSON)</span>
+                <textarea
+                  rows={8}
+                  value={stepsJson}
+                  onChange={(e) => setStepsJson(e.target.value)}
+                />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">What it checks (JSON)</span>
+                <textarea
+                  rows={6}
+                  value={assertionsJson}
+                  onChange={(e) => setAssertionsJson(e.target.value)}
+                />
+              </label>
+              <div className="row">
+                <button className="btn btn-sm btn-primary" disabled={busy !== null} onClick={save}>
+                  {busy === 'save' ? <span className="spinner" /> : null} Save
+                </button>
+                <button className="btn btn-sm btn-ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </button>
+                <span className="faint">
+                  Your edit goes through the same safety checks as the AI&apos;s.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <PlannedSteps steps={testCase.steps} assertions={testCase.assertions} />
+              <div className="row" style={{ marginTop: 10 }}>
+                {canWrite && (
+                  <button className="btn btn-sm btn-ghost" onClick={() => setEditing(true)}>
+                    Edit this test
+                  </button>
+                )}
+                {latest && (
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => setShowEvidence((v) => !v)}
+                  >
+                    {showEvidence ? 'Hide' : 'Show'} what happened
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           {showEvidence && latest && (
-            <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 12 }}>
               <ResultEvidence resultId={latest.id} />
             </div>
           )}

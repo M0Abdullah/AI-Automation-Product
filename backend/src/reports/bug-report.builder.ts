@@ -208,8 +208,13 @@ export function renderMarkdown(d: BugReportData): string {
 
   if (d.screenshotUrl || d.traceUrl) {
     L.push('## Evidence', '');
-    if (d.screenshotUrl) L.push(`- [Screenshot at failure](${d.screenshotUrl})`);
-    if (d.traceUrl) L.push(`- [Playwright trace](${d.traceUrl}) — open at trace.playwright.dev`);
+    if (d.screenshotUrl) {
+      // An image embed, not just a link: Jira, GitHub and Slack all render this,
+      // so whoever receives the report sees the failure without clicking.
+      L.push(`![Screenshot at failure](${d.screenshotUrl})`, '');
+      L.push(`[Open the screenshot](${d.screenshotUrl})`);
+    }
+    if (d.traceUrl) L.push(`[Playwright trace](${d.traceUrl}) — open at trace.playwright.dev`);
     L.push('');
   }
 

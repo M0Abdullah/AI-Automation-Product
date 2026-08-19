@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
 import type { PageSnapshot } from '../browser/browser.types';
+import type { CheckDefinition } from '../common/check-catalog';
 import type { TestCasePlan } from '../common/test-plan.types';
 import {
   LLM_PROVIDER,
@@ -57,6 +58,7 @@ export class LlmService {
     requirements: string;
     snapshot: PageSnapshot;
     hasCredentials: boolean;
+    checks: CheckDefinition[];
   }): Promise<GeneratedPlan> {
     const maxCases = this.config.policy.maxTestCasesPerRun;
     const userPrompt = buildTestPlanUserPrompt({ ...args, maxCases });
