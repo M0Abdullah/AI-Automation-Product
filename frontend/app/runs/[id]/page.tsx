@@ -154,7 +154,7 @@ export default function RunPage() {
             >
               {busy === 'execute' || inProgress ? <span className="spinner" /> : null}
               {inProgress
-                ? `Running ${s.executed}/${s.approvedCases}`
+                ? 'Running…'
                 : hasRun
                   ? `Run again (${s.approvedCases})`
                   : `Run ${s.approvedCases} test${s.approvedCases === 1 ? '' : 's'}`}
@@ -171,18 +171,32 @@ export default function RunPage() {
         {/* --------------------------------------- ONE line: what's going on */}
         <div style={{ marginTop: 16 }}>
           {inProgress ? (
-            <div className="banner banner-info">
-              <span className="spinner" />
-              <div>
-                <strong>
-                  {run.status === 'SCANNING'
-                    ? 'Reading the page in Chrome…'
-                    : run.status === 'PLANNING'
-                      ? 'The AI is writing your tests…'
-                      : 'Running your tests in Chrome…'}
-                </strong>
-                <div style={{ fontWeight: 400, marginTop: 2 }}>
-                  {run.statusMessage ?? 'This page updates by itself.'}
+            <div className="banner banner-info" style={{ display: 'block' }}>
+              <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+                <span className="spinner" style={{ marginTop: 4 }} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <strong>
+                    {run.status === 'SCANNING'
+                      ? 'Reading the page in Chrome…'
+                      : run.status === 'PLANNING'
+                        ? 'The AI is writing your tests…'
+                        : `Testing ${Math.min(s.executed + 1, s.approvedCases)} of ${s.approvedCases} in Chrome…`}
+                  </strong>
+                  <div style={{ fontWeight: 400, marginTop: 2 }}>
+                    {/* Strip the leading "Running 1/7: " the backend prefixes, so
+                        the count is not stated twice with different numbers. */}
+                    {run.statusMessage?.replace(/^Running \d+\/\d+:\s*/, '') ??
+                      'This page updates by itself.'}
+                  </div>
+
+                  {run.status === 'RUNNING' && s.approvedCases > 0 && (
+                    <div className="progress" style={{ marginTop: 10 }}>
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${(s.executed / s.approvedCases) * 100}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

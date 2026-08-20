@@ -135,8 +135,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <Link href="/" className="brand">
-          <span className="brand-mark">AI</span>
-          <span>Testing Platform</span>
+          <span className="brand-mark" aria-hidden="true">
+            <span className="brand-pulse" />
+          </span>
+          <span className="brand-copy">
+            <strong>AI Testing</strong>
+            <small>AI quality workspace</small>
+          </span>
         </Link>
 
         {NAV.map((item, i) => {
@@ -174,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {/* Signed-in identity is shown here as well as the sidebar: seeing data
               that belongs to a different account is confusing, so the account is
               always on screen. */}
-          <span className="pill">
+          <span className="topbar-identity">
             {user.email} · {ROLE_LABEL[user.role]}
           </span>
           <ThemeToggle />

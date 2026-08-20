@@ -85,7 +85,7 @@ export function RunForm() {
   };
 
   return (
-    <form className="stack" onSubmit={submit}>
+    <form className="test-composer" onSubmit={submit}>
       {error && (
         <div className="banner banner-error">
           <div>
@@ -102,7 +102,7 @@ export function RunForm() {
       )}
 
       {/* ------------------------------------------------------- 1. the URL */}
-      <div className="card">
+      <div className="card composer-url">
         <div className="step-head">
           <span className="step-num">1</span>
           <div>
@@ -120,7 +120,7 @@ export function RunForm() {
       </div>
 
       {/* --------------------------------------------------- 2. the checklist */}
-      <div className="card">
+      <div className="card composer-checks">
         <div className="step-head">
           <span className="step-num">2</span>
           <div>
@@ -146,7 +146,7 @@ export function RunForm() {
       </div>
 
       {/* ------------------------------------------------- 3. your own rules */}
-      <div className="card">
+      <div className="card composer-rules">
         <div className="step-head">
           <span className="step-num">3</span>
           <div>
@@ -178,7 +178,7 @@ export function RunForm() {
       </div>
 
       {/* --------------------------------------------------- 4. credentials */}
-      <div className="card">
+      <div className="card composer-login">
         <div className="step-head">
           <span className="step-num">4</span>
           <div>
@@ -235,7 +235,7 @@ export function RunForm() {
       </div>
 
       {/* ------------------------------------------------------ confirm + go */}
-      <div className="card">
+      <div className="card composer-submit">
         <label className="field" style={{ marginBottom: 14 }}>
           <span className="field-label">Name this run (optional)</span>
           <input

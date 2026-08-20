@@ -56,16 +56,17 @@ export default function DashboardPage() {
   return (
     <div className="stack">
       {/* ------------------------------------------------------------ header */}
-      <div className="spread">
+      <div className="spread page-hero">
         <div>
-          <h1>Dashboard</h1>
-          <span className="faint">
+          <span className="eyebrow">Quality overview</span>
+          <h1>Your testing command center</h1>
+          <span className="page-subtitle">
             {runs.total} run{runs.total === 1 ? '' : 's'} · {tests.total} test cases ·{' '}
             {findings.confirmed} confirmed bug{findings.confirmed === 1 ? '' : 's'}
           </span>
         </div>
         <Link href="/runs/new" className="btn btn-primary btn-lg">
-          + New test run
+          <span aria-hidden="true">+</span> New test run
         </Link>
       </div>
 
@@ -75,7 +76,7 @@ export default function DashboardPage() {
         <>
           {/* ------------------------------------------------ suite health */}
           <div className="grid-sidebar">
-            <div className="card">
+            <div className="card suite-health-card">
               <div className="card-head">
                 <h2>Suite health</h2>
                 <span className="faint">Latest result per test case</span>
