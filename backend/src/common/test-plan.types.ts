@@ -38,6 +38,9 @@ export const ALLOWED_ASSERTIONS = [
   'elementCountAtLeast',
   'noConsoleErrors', // no console error was logged during the test
   'noApiErrors', // no xhr/fetch request returned 4xx/5xx
+  // --- added for the second round of checks (loading + server data) ---
+  'noStuckLoader', // no spinner / skeleton is still on screen once the page settled
+  'apiDataRendered', // a value the API returned actually appears on the page
 ] as const;
 
 export type AssertionType = (typeof ALLOWED_ASSERTIONS)[number];
@@ -78,6 +81,13 @@ export const ASSERTION_REQUIREMENTS: Record<
   textContains: { target: 'optional', value: 'required' },
   textNotContains: { target: 'optional', value: 'required' },
   valueEquals: { target: 'required', value: 'required' },
+  // Target is optional: with one, only that element is watched for a spinner;
+  // without one, the whole page is scanned.
+  noStuckLoader: { target: 'optional', value: 'none' },
+  // value is the JSON field name to pull out of the API response (e.g. "email"
+  // or "user.name"). Required: without it there is nothing to compare, and a
+  // silent empty comparison is exactly the false-FAIL class of bug we reject.
+  apiDataRendered: { target: 'optional', value: 'required' },
   elementCountAtLeast: { target: 'required', value: 'required' },
   // Whole-page checks - they read the evidence collector, not the DOM.
   noConsoleErrors: { target: 'none', value: 'none' },

@@ -1,6 +1,15 @@
 import { Page, Request, Response } from 'playwright';
 import type { CapturedConsole, CapturedRequest } from './browser.types';
 
+/** One successful JSON response, parsed. */
+export interface CapturedJsonBody {
+  url: string;
+  method: string;
+  status: number;
+  json: unknown;
+  at: Date;
+}
+
 /**
  * Attaches listeners that record what QA actually needs to debug a failure:
  * console errors, failed API calls, and page crashes.
@@ -11,8 +20,17 @@ import type { CapturedConsole, CapturedRequest } from './browser.types';
 export class EvidenceCollector {
   readonly console: CapturedConsole[] = [];
   readonly network: CapturedRequest[] = [];
+  /**
+   * Successful JSON responses, kept so an assertion can compare what the server
+   * SENT against what the page SHOWS. Without this the platform can only prove a
+   * request failed, never that a 200 rendered the wrong value.
+   */
+  readonly jsonBodies: CapturedJsonBody[] = [];
   private readonly requestStart = new Map<Request, number>();
   private static readonly MAX_ENTRIES = 300;
+  /** Bodies are the only unbounded thing here, so cap both count and size. */
+  private static readonly MAX_BODIES = 40;
+  private static readonly MAX_BODY_CHARS = 200_000;
 
   /** Resource types we treat as "API calls" for the API-error list. */
   private static readonly API_TYPES = new Set(['xhr', 'fetch']);
@@ -71,6 +89,33 @@ export class EvidenceCollector {
         isApiError: status >= 400 && EvidenceCollector.API_TYPES.has(resourceType),
         at: new Date(),
       });
+
+      // Keep successful JSON payloads so an assertion can check that what the
+      // server sent is what the page actually shows. Bodies are read lazily and
+      // failures are swallowed: a body is often already gone by the time we ask
+      // (redirects, aborted requests), and that must never fail a test.
+      if (status < 400 && resourceType !== 'document') {
+        const ct = (res.headers()['content-type'] ?? '').toLowerCase();
+        if (ct.includes('json') && this.jsonBodies.length < EvidenceCollector.MAX_BODIES) {
+          void res
+            .text()
+            .then((body) => {
+              if (body.length > EvidenceCollector.MAX_BODY_CHARS) return;
+              try {
+                this.jsonBodies.push({
+                  url: res.url().slice(0, 2000),
+                  method: req.method(),
+                  status,
+                  json: JSON.parse(body) as unknown,
+                  at: new Date(),
+                });
+              } catch {
+                /* not valid JSON despite the header - ignore */
+              }
+            })
+            .catch(() => undefined);
+        }
+      }
     });
 
     // A request that never got a response at all (DNS, TLS, connection reset).

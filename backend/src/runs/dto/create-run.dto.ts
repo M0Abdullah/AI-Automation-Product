@@ -69,6 +69,56 @@ export class CreateRunDto {
   @Type(() => CredentialsDto)
   credentials?: CredentialsDto;
 
+  /**
+   * Where to sign in, when the target page sits behind a login.
+   *
+   * Given this plus credentials, the platform signs in once BEFORE scanning and
+   * reuses that session for every test. Without it, a protected URL redirects
+   * to the login page and every generated test describes the wrong page.
+   */
+  @IsOptional()
+  @IsUrl(
+    { require_tld: false, require_protocol: true },
+    { message: 'loginUrl must be a full URL including http:// or https://' },
+  )
+  loginUrl?: string;
+
+  /**
+   * Explicit control labels for the sign-in form, for the cases where
+   * auto-detection cannot find them (icon-only buttons, unlabelled inputs).
+   */
+  @IsOptional()
+  @IsString()
+  @Length(1, 120)
+  loginEmailField?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 120)
+  loginPassField?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 120)
+  loginSubmit?: string;
+
+  /**
+   * Figma design to check the page against.
+   *
+   * Taken from a Figma URL: figma.com/design/<fileKey>/Name?node-id=<nodeId>.
+   * Both are needed - the file alone is usually a whole design system, and
+   * comparing a login page against every component in it is meaningless.
+   */
+  @IsOptional()
+  @IsString()
+  @Length(10, 128)
+  figmaFileKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 64)
+  figmaNodeId?: string;
+
   /** The user confirms they are allowed to test this site. Required. */
   @IsBoolean()
   authorized!: boolean;

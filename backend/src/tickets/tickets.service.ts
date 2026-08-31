@@ -76,7 +76,7 @@ export class TicketsService {
           bugNumber: number,
           module: dto.module ?? finding.module,
           build: dto.build ?? finding.build,
-          priority: dto.priority ?? finding.priority ?? finding.testCase.priority,
+          priority: dto.priority ?? finding.priority ?? finding.testCase?.priority,
         },
       });
     }
@@ -94,10 +94,10 @@ export class TicketsService {
         key: ticketKey,
         number,
         findingId,
-        title: dto.title ?? `${bugKey}: ${finding.testCase.title}`,
+        title: dto.title ?? `${bugKey}: ${finding.title ?? finding.testCase?.title ?? 'Finding'}`,
         description,
         status: TicketStatus.OPEN,
-        priority: dto.priority ?? finding.priority ?? finding.testCase.priority ?? 'P2',
+        priority: dto.priority ?? finding.priority ?? finding.testCase?.priority ?? 'P2',
         severity: dto.severity ?? finding.severity,
         module: dto.module ?? finding.module,
         build: dto.build ?? finding.build,
@@ -267,6 +267,16 @@ export class TicketsService {
       },
     });
     if (!ticket) throw new NotFoundException(`Ticket ${id} not found`);
+
+    // Retest replays the original test case. A finding promoted from a wording
+    // review or a design comparison has no test case to replay, so say so
+    // plainly instead of silently doing nothing and reporting a pass.
+    if (!ticket.finding.testCase || !ticket.finding.testCaseId) {
+      throw new BadRequestException(
+        'This ticket did not come from an automated test, so it cannot be retested ' +
+          'automatically. Verify the fix on the page and close the ticket manually.',
+      );
+    }
 
     await this.pipeline.runSingleCase(ticket.finding.run, ticket.finding.testCase);
 

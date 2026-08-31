@@ -78,6 +78,7 @@ export class ReportsService {
       where: { id: findingId },
       include: {
         testCase: true,
+        contentIssue: true,
         run: { select: { name: true, targetUrl: true, requirements: true } },
         result: { include: { consoleLogs: true, networkLogs: true } },
         ticket: {
@@ -87,7 +88,14 @@ export class ReportsService {
     });
     if (!finding) throw new NotFoundException(`Finding ${findingId} not found`);
 
+    /**
+     * A finding no longer always comes from a failed test. A promoted typo, or
+     * a layout that disagrees with the design, has no TestResult - so every
+     * result-derived field below is written to degrade to a sensible empty
+     * value rather than assuming one exists.
+     */
     const r = finding.result;
+    const tc = finding.testCase;
 
     // A finding only gets a BUG key when it is confirmed. Before that, label it
     // clearly as a draft rather than inventing a permanent id.
@@ -98,11 +106,11 @@ export class ReportsService {
       {},
     );
 
-    const consoleErrors = r.consoleLogs
+    const consoleErrors = (r?.consoleLogs ?? [])
       .filter((c) => c.level === 'ERROR')
       .map((c) => (c.location ? `${c.message}  (${c.location})` : c.message));
 
-    const apiErrors = r.networkLogs
+    const apiErrors = (r?.networkLogs ?? [])
       .filter((n) => n.isApiError || n.failureText)
       .map((n) =>
         n.failureText
@@ -115,7 +123,7 @@ export class ReportsService {
     // where a relative path is a broken image.
     const base = this.config.publicApiUrl;
     let screenshotUrl: string | null = null;
-    if (r.screenshotPath) {
+    if (r?.screenshotPath) {
       screenshotUrl = opts.inlineScreenshot
         ? await this.inlineScreenshot(r.screenshotPath)
         : `${base}/api/artifacts/${r.screenshotPath}`;
@@ -123,14 +131,15 @@ export class ReportsService {
 
     return {
       bugKey,
-      title: finding.testCase.title,
+      title: finding.title ?? tc?.title ?? 'Finding',
       status: finding.status,
       severity: finding.severity,
-      priority: finding.priority ?? finding.testCase.priority,
+      priority: finding.priority ?? tc?.priority ?? null,
       module: finding.module,
       build: finding.build,
       classification: finding.humanClassification,
       aiClassification: finding.aiClassification,
+      aiCategory: finding.aiCategory,
       aiConfidence: finding.aiConfidence,
       aiSummary: finding.aiSummary,
       aiSuspectedCause: finding.aiSuspectedCause,
@@ -141,34 +150,57 @@ export class ReportsService {
       assignee: finding.assignee,
       note: finding.note,
 
-      requirement: finding.testCase.requirement ?? finding.run.requirements.slice(0, 400),
-      testCaseTitle: finding.testCase.title,
-      testCasePriority: finding.testCase.priority,
+      // For a content or design finding the "requirement" is the thing that was
+      // reviewed, not a test case line.
+      requirement:
+        tc?.requirement ??
+        (finding.contentIssue
+          ? `Page copy review: ${finding.contentIssue.kind.toLowerCase()}`
+          : finding.run.requirements.slice(0, 400)),
+      testCaseTitle: tc?.title ?? finding.title ?? 'Not from a test case',
+      testCasePriority: tc?.priority ?? null,
 
       environment: {
         url: finding.run.targetUrl,
         runName: finding.run.name,
-        browser: r.browserName,
-        browserVersion: r.browserVersion,
-        viewport: r.viewport,
-        finalUrl: r.finalUrl,
+        browser: r?.browserName ?? null,
+        browserVersion: r?.browserVersion ?? null,
+        viewport: r?.viewport ?? null,
+        finalUrl: r?.finalUrl ?? null,
       },
 
-      failure: {
-        errorType: r.errorType,
-        errorMessage: r.errorMessage,
-        expected: r.expected,
-        actual: r.actual,
-        failedStepLabel: r.failedStepLabel,
-        durationMs: r.durationMs,
-        attempt: r.attempt,
-      },
+      // A promoted wording issue has no browser failure, so the expected/actual
+      // pair describes the text instead. Same report shape either way, which is
+      // what lets one builder render every kind of finding.
+      failure: finding.contentIssue
+        ? {
+            errorType: 'CONTENT',
+            errorMessage:
+              finding.contentIssue.reason ??
+              `${finding.contentIssue.kind} in the page copy`,
+            expected: finding.contentIssue.suggestion ?? '(corrected wording)',
+            actual: finding.contentIssue.text,
+            failedStepLabel: finding.contentIssue.whereSeen
+              ? `seen in ${finding.contentIssue.whereSeen}`
+              : null,
+            durationMs: null,
+            attempt: null,
+          }
+        : {
+            errorType: r?.errorType ?? null,
+            errorMessage: r?.errorMessage ?? null,
+            expected: r?.expected ?? null,
+            actual: r?.actual ?? null,
+            failedStepLabel: r?.failedStepLabel ?? null,
+            durationMs: r?.durationMs ?? null,
+            attempt: r?.attempt ?? null,
+          },
 
-      steps: unpackJson<StepResult[]>(r.stepResults, []),
+      steps: unpackJson<StepResult[]>(r?.stepResults ?? null, []),
       consoleErrors: consoleErrors.length ? consoleErrors : (evidence.consoleErrors ?? []),
       apiErrors: apiErrors.length ? apiErrors : (evidence.apiErrors ?? []),
       screenshotUrl,
-      traceUrl: r.tracePath ? `${base}/api/artifacts/${r.tracePath}` : null,
+      traceUrl: r?.tracePath ? `${base}/api/artifacts/${r.tracePath}` : null,
       ticket: finding.ticket,
     };
   }

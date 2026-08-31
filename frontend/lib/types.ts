@@ -123,6 +123,64 @@ export interface FindingEvent {
   createdAt: string;
 }
 
+/**
+ * WHAT KIND of defect. Separate axis from Classification (whose fault):
+ * a defect can be PRODUCT_BUG + UI_VISUAL, or PRODUCT_BUG + DATA.
+ */
+export type BugCategory =
+  | 'FUNCTIONAL'
+  | 'TECHNICAL'
+  | 'DATA'
+  | 'CONTENT'
+  | 'UI_VISUAL'
+  | 'LOADING'
+  | 'UNKNOWN';
+
+export type ContentIssueKind =
+  | 'TYPO'
+  | 'GRAMMAR'
+  | 'LABEL'
+  | 'CASING'
+  | 'PLACEHOLDER'
+  | 'INCONSISTENT';
+
+/**
+ * An advisory wording problem found by reading the page text.
+ * Never a failure and never a bug id - a review suggestion only.
+ */
+export interface ContentIssue {
+  id: string;
+  runId: string;
+  kind: ContentIssueKind;
+  text: string;
+  suggestion?: string | null;
+  reason?: string | null;
+  confidence: number;
+  whereSeen?: string | null;
+  status: 'NEW' | 'ACCEPTED' | 'DISMISSED';
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+}
+
+/** One place the live page disagrees with the Figma design. Advisory. */
+export interface DesignIssue {
+  id: string;
+  runId: string;
+  property: string;
+  element: string;
+  selector: string;
+  actual: string;
+  expected: string;
+  /** Distance from the design value. Smaller = more likely a real mistake. */
+  offBy: number;
+  note?: string | null;
+  status: 'NEW' | 'ACCEPTED' | 'DISMISSED';
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+}
+
 export interface Finding {
   id: string;
   /** Permanent bug id (BUG-007). Null until a human confirms the defect. */
@@ -146,6 +204,8 @@ export interface Finding {
   assignee?: string | null;
   signature: string;
   aiClassification?: Classification | null;
+  /** WHAT KIND of defect, independent of whose fault it is. */
+  aiCategory?: BugCategory | null;
   aiConfidence?: number | null;
   aiSummary?: string | null;
   aiSuspectedCause?: string | null;
@@ -247,9 +307,21 @@ export interface RunDetail {
   finishedAt?: string | null;
   hasCredentials: boolean;
   project: { id: string; name: string; baseUrl: string };
+  /** Set when this run signs in before testing. */
+  loginUrl?: string | null;
+  /** How the sign-in was confirmed, e.g. "navigated from /login to /secure". */
+  sessionEvidence?: string | null;
   testCases: TestCase[];
   rejections: PolicyRejection[];
   findings: Finding[];
+  /** Advisory wording problems. Absent on runs made before the content pass shipped. */
+  contentIssues?: ContentIssue[];
+  /** Advisory design deviations. Only present when a Figma frame was given. */
+  designIssues?: DesignIssue[];
+  figmaFileKey?: string | null;
+  figmaNodeId?: string | null;
+  /** What was read from Figma and how the comparison went, in one line. */
+  designSpecSummary?: string | null;
   summary: RunSummary;
 }
 

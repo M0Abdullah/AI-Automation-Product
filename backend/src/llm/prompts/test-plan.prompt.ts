@@ -43,6 +43,14 @@ ACTION NOTES
   - press: target is a key name such as "Enter".
   - waitForUrl / urlContains: value is a URL fragment such as "/dashboard".
   - noConsoleErrors / noApiErrors: no target needed. Add these to smoke tests.
+  - noStuckLoader: no value. Target optional (omit it to scan the whole page). Asserts no
+    spinner or skeleton is still visible once the page has settled. Use it when the page is
+    data-driven; skip it on a static page where nothing loads asynchronously.
+  - apiDataRendered: value is REQUIRED and is the JSON field name you expect the page to
+    display ("email", "total", or a dotted path like "data.user.name"). Target is optional
+    and scopes the search to one element. Only use a field name that appears in the
+    requirement or is strongly implied by a label in PAGE SCAN. Never invent a field name -
+    if you are unsure, do not emit this assertion at all.
 
 OUTPUT SHAPE — every step and every assertion MUST be an object, never a string.
 Copy this structure exactly:

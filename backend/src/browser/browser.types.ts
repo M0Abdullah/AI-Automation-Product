@@ -39,6 +39,12 @@ export interface PageSnapshot {
   elements: ScannedElement[];
   forms: ScannedForm[];
   visibleTextSample: string;
+  /**
+   * The same text with one line per block element, and a longer cap.
+   * Used by the wording pass, where gluing blocks together invents grammar
+   * bugs that are not on the page. Optional: older stored snapshots lack it.
+   */
+  contentTextSample?: string;
   consoleErrors: string[];
   failedRequests: string[];
   scannedAt: string;

@@ -51,6 +51,33 @@ export const Classification = {
 } as const;
 export type Classification = (typeof Classification)[keyof typeof Classification];
 
+/**
+ * WHAT KIND of defect this is, as opposed to Classification, which says WHOSE
+ * FAULT it is. The two are independent axes and QA needs both:
+ *
+ *   Classification -> PRODUCT_BUG   (it is really our bug)
+ *   BugCategory    -> UI_VISUAL     (and it is a layout problem, not logic)
+ *
+ * Without this, every confirmed defect looked the same in the report and a
+ * triager could not tell a misaligned button from a failed API call.
+ */
+export const BugCategory = {
+  /** Logic and behaviour: the app did the wrong thing. */
+  FUNCTIONAL: 'FUNCTIONAL',
+  /** Crashes, exceptions, failed requests, timeouts - the plumbing broke. */
+  TECHNICAL: 'TECHNICAL',
+  /** The values shown on screen are wrong, missing or stale. */
+  DATA: 'DATA',
+  /** Wording: typos, grammar, wrong labels, untranslated strings. */
+  CONTENT: 'CONTENT',
+  /** Layout, spacing, alignment, overlap, things not rendering visibly. */
+  UI_VISUAL: 'UI_VISUAL',
+  /** Loading states: stuck spinners, skeletons that never resolve. */
+  LOADING: 'LOADING',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+export type BugCategory = (typeof BugCategory)[keyof typeof BugCategory];
+
 export const Severity = {
   S1_BLOCKER: 'S1_BLOCKER',
   S2_MAJOR: 'S2_MAJOR',

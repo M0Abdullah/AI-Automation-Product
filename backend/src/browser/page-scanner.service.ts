@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
-import { BrowserFactory } from './browser.factory';
+import { BrowserFactory, type StorageState } from './browser.factory';
 import { EvidenceCollector } from './evidence-collector';
 import { waitForInteractiveContent } from './page-settle';
 import type { PageSnapshot, ScannedElement, ScannedForm } from './browser.types';
@@ -25,9 +25,13 @@ export class PageScannerService {
     private readonly config: AppConfigService,
   ) {}
 
-  async scan(url: string): Promise<PageSnapshot> {
+  /**
+   * @param storageState An established sign-in. Without it a protected URL just
+   *   redirects to the login page and the snapshot describes the wrong page.
+   */
+  async scan(url: string, storageState?: StorageState): Promise<PageSnapshot> {
     const started = Date.now();
-    const context = await this.browsers.newContext();
+    const context = await this.browsers.newContext(storageState);
     const page = await context.newPage();
     const evidence = new EvidenceCollector(page);
 
@@ -59,6 +63,7 @@ export class PageScannerService {
         elements: extracted.elements as unknown as ScannedElement[],
         forms: extracted.forms as unknown as ScannedForm[],
         visibleTextSample: extracted.visibleTextSample,
+        contentTextSample: extracted.contentTextSample,
         consoleErrors: evidence.consoleErrorTexts.slice(0, 20),
         failedRequests: evidence.apiErrorTexts.slice(0, 20),
         scannedAt: new Date().toISOString(),
@@ -226,11 +231,26 @@ function extractPageStructure(maxElements: number) {
     .slice(0, 20);
 
   // A short text sample helps the model understand the page purpose, and lets
-  // textContains assertions reference real on-page wording.
-  const visibleTextSample = (document.body?.innerText ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 1200);
+  // textContains assertions reference real on-page wording. Flattened on
+  // purpose: the planner wants gist, and newlines cost tokens for no gain.
+  const rawText = document.body?.innerText ?? '';
+  const visibleTextSample = rawText.replace(/\s+/g, ' ').trim().slice(0, 1200);
+
+  // A SECOND, structure-preserving sample for the content/wording pass.
+  //
+  // Flattening is actively harmful there: innerText puts a newline between
+  // separate elements, so collapsing whitespace glues a heading onto the
+  // paragraph below it ("Login Page" + "This is where..." -> "Login Page This
+  // is where...") and a copy editor then reports a missing full stop that does
+  // not exist on the page. One line per block keeps each element judgeable on
+  // its own. Longer cap too, since a spell-check over 1200 characters misses
+  // most of the copy.
+  const contentTextSample = rawText
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join('\n')
+    .slice(0, 8000);
 
   // De-duplicate: the same button often matches several of our queries.
   const seen = new Set<string>();
@@ -241,5 +261,12 @@ function extractPageStructure(maxElements: number) {
     return true;
   });
 
-  return { elements: deduped, forms, headings, visibleTextSample, truncated };
+  return {
+    elements: deduped,
+    forms,
+    headings,
+    visibleTextSample,
+    contentTextSample,
+    truncated,
+  };
 }

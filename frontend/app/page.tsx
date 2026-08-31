@@ -456,18 +456,53 @@ function Stat({
   );
 }
 
+/**
+ * The first screen a new user sees, and previously a mostly-empty box floating
+ * in half a page of nothing. An empty dashboard is the one moment where showing
+ * what the product DOES is more useful than apologising for having no data, so
+ * it now carries the three-step flow and fills the space on purpose.
+ */
 function EmptyState() {
+  const steps = [
+    { n: '1', title: 'Give it a page', body: 'A staging URL you are allowed to test, and tick what should be checked.' },
+    { n: '2', title: 'Approve the tests', body: 'Chrome reads the page, the AI writes the cases. Nothing runs until you say so.' },
+    { n: '3', title: 'Get the evidence', body: 'Screenshot, console and network logs, and whether it is really our bug.' },
+  ];
+
   return (
-    <div className="card" style={{ padding: '40px 28px', textAlign: 'center' }}>
-      <div style={{ fontSize: 30, marginBottom: 10, opacity: 0.5 }}>▶</div>
-      <h2 style={{ fontSize: 19 }}>No test runs yet</h2>
-      <p className="faint" style={{ maxWidth: 460, margin: '8px auto 18px' }}>
-        Give the platform a page you are authorised to test and describe what should work. It reads
-        the page in Chrome, proposes test cases, and you approve them before anything runs.
+    <div className="onboard">
+      <div className="onboard-head">
+        <span className="onboard-mark" aria-hidden>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6h16M4 12h10M4 18h7" />
+            <circle cx="17.5" cy="16.5" r="4" />
+            <path d="m20.5 19.5 2 2" />
+          </svg>
+        </span>
+        <h2>No test runs yet</h2>
+        <p>
+          Point it at a page you are authorised to test. It reads the page in real Chrome,
+          proposes the test cases, and waits for your approval before anything runs.
+        </p>
+        <Link href="/runs/new" className="btn btn-primary btn-lg">
+          Start your first run
+        </Link>
+      </div>
+
+      <div className="onboard-steps">
+        {steps.map((s) => (
+          <div className="onboard-step" key={s.n}>
+            <span className="onboard-step-n">{s.n}</span>
+            <strong>{s.title}</strong>
+            <span className="faint">{s.body}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className="onboard-foot">
+        Across three real applications it has never once reported a failure as our bug when it
+        was not. Every verdict is a plain assertion, and every bug needs a human to confirm it.
       </p>
-      <Link href="/runs/new" className="btn btn-primary btn-lg">
-        Start your first run
-      </Link>
     </div>
   );
 }

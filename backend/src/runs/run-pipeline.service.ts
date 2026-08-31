@@ -3,7 +3,14 @@ import type { Run, TestCase } from '@prisma/client';
 import * as crypto from 'node:crypto';
 import { PageScannerService } from '../browser/page-scanner.service';
 import { TestExecutorService } from '../browser/test-executor.service';
-import type { ExecutionOutcome } from '../browser/browser.types';
+import type { ExecutionOutcome, PageSnapshot } from '../browser/browser.types';
+import type { StorageState } from '../browser/browser.factory';
+import { LoginFailedError, SessionService } from '../browser/session.service';
+import { BrowserFactory } from '../browser/browser.factory';
+import { waitForInteractiveContent } from '../browser/page-settle';
+import { compareToSpec, measurePage } from '../design/design-compare';
+import { extractDesignSpec, specIsUsable } from '../design/design-spec';
+import { FigmaError, FigmaService } from '../design/figma.service';
 import { resolveChecks } from '../common/check-catalog';
 import { packJson, packJsonNullable, packTags, unpackJson, unpackTags } from '../common/db-json';
 import { Classification, ResultStatus, RunStatus } from '../common/enums';
@@ -34,12 +41,18 @@ import type { StepResult, TestAssertion, TestStep } from '../common/test-plan.ty
  */
 @Injectable()
 export class RunPipelineService {
+  /** 30 minutes. Comfortably inside a typical session lifetime. */
+  private static readonly SESSION_MAX_AGE_MS = 30 * 60 * 1000;
+
   private readonly logger = new Logger(RunPipelineService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly scanner: PageScannerService,
     private readonly executor: TestExecutorService,
+    private readonly session: SessionService,
+    private readonly figma: FigmaService,
+    private readonly browsers: BrowserFactory,
     private readonly llm: LlmService,
     private readonly policy: PolicyService,
     private readonly secrets: SecretsService,
@@ -62,19 +75,34 @@ export class RunPipelineService {
       include: { secret: true },
     });
 
+    // ------------------------------------------- 0. sign in, if asked to
+    // Before the scan on purpose. A protected URL redirects an anonymous
+    // browser to the login page, so scanning first would describe the wrong
+    // page and every generated test would assert against something never seen.
+    let storageState: StorageState | undefined;
+    if (run.loginUrl) {
+      await this.prisma.run.update({
+        where: { id: runId },
+        data: { status: RunStatus.SCANNING, statusMessage: 'Signing in' },
+      });
+      const established = await this.establishSession(run);
+      if (!established) return; // establishSession already failed the run
+      storageState = established;
+    }
+
     // ---------------------------------------------------- 1. scan the page
     await this.prisma.run.update({
       where: { id: runId },
       data: {
         status: RunStatus.SCANNING,
         scanStartedAt: new Date(),
-        statusMessage: 'Opening the page',
+        statusMessage: storageState ? 'Opening the page as a signed-in user' : 'Opening the page',
       },
     });
 
     let snapshot;
     try {
-      snapshot = await this.scanner.scan(run.targetUrl);
+      snapshot = await this.scanner.scan(run.targetUrl, storageState);
     } catch (err) {
       await this.fail(runId, RunStatus.SCAN_FAILED, `Could not open ${run.targetUrl}: ${msg(err)}`);
       return;
@@ -117,6 +145,20 @@ export class RunPipelineService {
         statusMessage: `Found ${snapshot.elements.length} elements. Asking the model for test cases.`,
       },
     });
+
+    // -------------------------------- 1b. content pass (advisory, fire and forget)
+    // Deliberately not awaited: it reads the copy the scan already captured, so
+    // it cannot influence the plan, and making the user wait for a spell-check
+    // before seeing their test cases would be a poor trade. Failures inside are
+    // swallowed by the service.
+    void this.runContentCheck(runId, snapshot);
+
+    // Design comparison, also fire-and-forget and for the same reason: it needs
+    // only the URL, it cannot change the plan, and making the user wait on the
+    // Figma API before seeing their test cases would be a poor trade.
+    if (run.figmaFileKey && run.figmaNodeId) {
+      void this.runDesignCheck(run.id, run.targetUrl, run.figmaFileKey, run.figmaNodeId, storageState);
+    }
 
     // ------------------------------------------------ 2. ask for a test plan
     const hasCredentials = Boolean(run.secret?.emailCipher || run.secret?.passwordCipher);
@@ -260,6 +302,24 @@ export class RunPipelineService {
 
     const values = this.secrets.buildRuntimeValues(run.secret);
 
+    // Reuse the sign-in captured before the scan. Approval can happen hours
+    // later, so the session may have expired in the meantime - if it has, sign
+    // in again rather than running every test as an anonymous visitor.
+    let storageState = this.loadSession(run.secret);
+    if (run.loginUrl) {
+      const stale = this.sessionIsStale(run.secret?.sessionCreatedAt ?? null);
+      if (!storageState || stale) {
+        await this.prisma.run.update({
+          where: { id: runId },
+          data: {
+            statusMessage: stale ? 'Session expired - signing in again' : 'Signing in',
+          },
+        });
+        storageState = (await this.establishSession(run)) ?? undefined;
+        if (!storageState) return; // establishSession already failed the run
+      }
+    }
+
     let index = 0;
     for (const testCase of run.testCases) {
       index++;
@@ -267,7 +327,7 @@ export class RunPipelineService {
         where: { id: runId },
         data: { statusMessage: `Running ${index}/${run.testCases.length}: ${testCase.title}` },
       });
-      await this.runSingleCase(run, testCase, values);
+      await this.runSingleCase(run, testCase, values, storageState);
     }
 
     // Count only the results this execution produced. Grouping over every
@@ -281,6 +341,11 @@ export class RunPipelineService {
       where: { runId, startedAt: execStartedAt ? { gte: execStartedAt } : undefined },
       _count: true,
     });
+
+    // The run is over, so the session cookie has no further purpose. Wiped
+    // before the status flips, so no window exists where a COMPLETED run still
+    // holds live credentials for the site under test.
+    await this.wipeSession(runId);
 
     await this.prisma.run.update({
       where: { id: runId },
@@ -300,6 +365,12 @@ export class RunPipelineService {
     run: Run & { secret?: { emailCipher: string | null; passwordCipher: string | null } | null },
     testCase: TestCase,
     valuesIn?: Record<string, string>,
+    /**
+     * The run's shared sign-in. Passed in rather than loaded here so a run of
+     * 20 tests decrypts it once instead of 20 times, and so a single retest of
+     * one case can still be given a freshly established session.
+     */
+    storageState?: StorageState,
   ) {
     const values = valuesIn ?? this.secrets.buildRuntimeValues(run.secret ?? null);
 
@@ -317,6 +388,7 @@ export class RunPipelineService {
       values,
       runId: run.id,
       attempt: 1,
+      storageState,
     });
     await this.persistResult(run.id, testCase.id, 1, first, first.status, values);
 
@@ -335,6 +407,7 @@ export class RunPipelineService {
       testCase: executable,
       startUrl: run.targetUrl,
       values,
+      storageState,
       runId: run.id,
       attempt: 2,
     });
@@ -543,6 +616,7 @@ export class RunPipelineService {
       where: { id: finding.id },
       data: {
         aiClassification: flaky ? Classification.FLAKY : triage.classification,
+        aiCategory: triage.category,
         aiConfidence: triage.confidence,
         aiSummary: triage.summary,
         aiSuspectedCause: triage.suspectedCause,
@@ -563,6 +637,268 @@ export class RunPipelineService {
       .update({
         where: { id: runId },
         data: { status, statusMessage: message, finishedAt: new Date() },
+      })
+      .catch(() => undefined);
+  }
+
+  /**
+   * Compare the live page against a Figma design.
+   *
+   * Reads the design as a SPECIFICATION - the button heights, radii, type sizes
+   * and fonts it permits - and checks the page for conformance, rather than
+   * trying to pair each Figma layer with one element. Layer names in a real
+   * design system look like "Color=Brand, Size=base, State=Initial" while the
+   * live button says "Pricing & FAQ"; there is nothing to pair on, and an app
+   * page rarely mirrors a design frame anyway.
+   *
+   * Advisory, like the content pass: a difference is not proof of a mistake,
+   * so a human promotes these rather than the platform filing them.
+   */
+  private async runDesignCheck(
+    runId: string,
+    url: string,
+    fileKey: string,
+    nodeId: string,
+    storageState?: StorageState,
+  ): Promise<void> {
+    try {
+      const [fileName, root] = await Promise.all([
+        this.figma.fileName(fileKey),
+        this.figma.getNode(fileKey, nodeId, 4),
+      ]);
+
+      const spec = extractDesignSpec({ root, fileKey, fileName });
+      const usable = specIsUsable(spec);
+      if (!usable.ok) {
+        await this.prisma.run.update({
+          where: { id: runId },
+          data: { designSpecSummary: `Design not usable: ${usable.reason}` },
+        });
+        return;
+      }
+
+      // A fresh context, and the run's session if it has one - a design check on
+      // a page behind a login must see the same page the tests will.
+      const context = await this.browsers.newContext(storageState);
+      let measured;
+      try {
+        const page = await context.newPage();
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await waitForInteractiveContent(page, {
+          timeoutMs: this.config.browser.settleTimeout,
+          pollMs: this.config.browser.settlePoll,
+          graceMs: this.config.browser.settleGrace,
+        });
+        measured = await measurePage(page);
+      } finally {
+        await context.close().catch(() => undefined);
+      }
+
+      const cmp = compareToSpec(measured, spec);
+
+      if (cmp.deviations.length) {
+        await this.prisma.designIssue.createMany({
+          data: cmp.deviations.slice(0, 60).map((d) => ({
+            runId,
+            property: d.property,
+            element: d.element.slice(0, 200),
+            selector: d.selector.slice(0, 200),
+            actual: d.actual,
+            expected: d.expected,
+            offBy: d.offBy,
+            note: d.note,
+          })),
+        });
+      }
+
+      // The summary carries the CONFORMING count too. "7 deviations" alone reads
+      // as a broken page; "7 out of 307 checks" reads as a mostly-correct one,
+      // and the second is the honest framing.
+      await this.prisma.run.update({
+        where: { id: runId },
+        data: {
+          designSpecSummary:
+            `${spec.nodeName} in "${spec.fileName}" - ${spec.sampled.nodes} layers. ` +
+            `Heights ${spec.buttonHeights.join('/')}px, radii ${spec.cornerRadii.join('/')}px, ` +
+            `type ${spec.fontSizes.join('/')}px. ` +
+            `${cmp.conforming} value(s) matched, ${cmp.deviations.length} deviation(s) ` +
+            `across ${cmp.checked} element(s).`,
+        },
+      });
+      this.logger.log(
+        `Design check on ${runId}: ${cmp.deviations.length} deviation(s), ${cmp.conforming} matches`,
+      );
+    } catch (err) {
+      const detail =
+        err instanceof FigmaError ? `${err.message} ${err.hint}` : String(err);
+      this.logger.warn(`Design check on ${runId} failed: ${detail}`);
+      await this.prisma.run
+        .update({
+          where: { id: runId },
+          data: { designSpecSummary: `Design check failed: ${detail.slice(0, 400)}` },
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  /**
+   * The content pass: wording problems in the page's own text.
+   *
+   * ADVISORY. These are stored as ContentIssue rows, never as Findings, so they
+   * cannot fail a test or take a BUG id. Low-confidence rows are dropped here
+   * rather than in the UI - a list nobody trusts is worse than a shorter list.
+   */
+  private async runContentCheck(runId: string, snapshot: PageSnapshot): Promise<void> {
+    try {
+      const labels = snapshot.elements
+        .map((e) => (e.label ?? '').trim())
+        .filter((l) => l.length > 0 && l.length <= 120);
+
+      const { issues } = await this.llm.checkContent({
+        url: snapshot.finalUrl,
+        title: snapshot.title,
+        headings: snapshot.headings ?? [],
+        elementLabels: Array.from(new Set(labels)),
+        // The structure-preserving sample, not the flattened one: collapsing
+        // newlines glues a heading onto the next paragraph and the editor then
+        // reports punctuation bugs that are not on the page.
+        visibleTextSample: snapshot.contentTextSample ?? snapshot.visibleTextSample ?? '',
+      });
+
+      // 0.5 is the floor for showing anything at all. Below that the model is
+      // usually guessing at a brand name, which is the one failure mode that
+      // makes a reviewer abandon the whole list.
+      const worth = issues.filter((i) => i.confidence >= 0.5 && i.text.trim().length > 0);
+      if (!worth.length) {
+        this.logger.log(`Content check on ${runId}: nothing worth reporting`);
+        return;
+      }
+
+      await this.prisma.contentIssue.createMany({
+        data: worth.map((i) => ({
+          runId,
+          kind: i.kind,
+          text: i.text.trim().slice(0, 300),
+          suggestion: i.suggestion?.trim() || null,
+          reason: i.reason?.trim() || null,
+          confidence: i.confidence,
+          whereSeen: i.whereSeen?.trim() || null,
+        })),
+      });
+      this.logger.log(`Content check on ${runId}: stored ${worth.length} issue(s)`);
+    } catch (err) {
+      // Never allowed to affect the run.
+      this.logger.warn(`Content check on ${runId} failed: ${String(err)}`);
+    }
+  }
+
+  /**
+   * Sign in for this run and persist the resulting browser state.
+   *
+   * Returns undefined after failing the run, so callers can simply bail out.
+   * A sign-in that does not work must stop the run: continuing would generate a
+   * full suite against a login page and then blame the application for it, which
+   * is precisely the false-bug-report failure this platform exists to avoid.
+   */
+  private async establishSession(
+    run: Run & { secret?: { emailCipher: string | null; passwordCipher: string | null } | null },
+  ): Promise<StorageState | undefined> {
+    if (!run.loginUrl) return undefined;
+
+    const values = this.secrets.buildRuntimeValues(run.secret ?? null);
+    const email = values.test_email;
+    const password = values.test_password;
+
+    if (!email || !password) {
+      await this.fail(
+        run.id,
+        RunStatus.SCAN_FAILED,
+        'A sign-in URL was given but no test credentials were saved with this run. ' +
+          'Add the test email and password, or clear the sign-in URL to test the page ' +
+          'as an anonymous visitor.',
+      );
+      return undefined;
+    }
+
+    try {
+      const result = await this.session.establish({
+        loginUrl: run.loginUrl,
+        email,
+        password,
+        emailField: run.loginEmailField ?? undefined,
+        passwordField: run.loginPassField ?? undefined,
+        submitButton: run.loginSubmit ?? undefined,
+      });
+
+      await this.prisma.runSecret.upsert({
+        where: { runId: run.id },
+        create: {
+          runId: run.id,
+          sessionCipher: this.secrets.encrypt(JSON.stringify(result.storageState)),
+          sessionCreatedAt: new Date(),
+        },
+        update: {
+          sessionCipher: this.secrets.encrypt(JSON.stringify(result.storageState)),
+          sessionCreatedAt: new Date(),
+        },
+      });
+
+      await this.prisma.run.update({
+        where: { id: run.id },
+        data: { sessionEvidence: `${result.evidence} (${result.durationMs} ms)` },
+      });
+
+      return result.storageState;
+    } catch (err) {
+      // A login failure is a setup problem, not a test result. Say what to do
+      // about it rather than surfacing a stack trace.
+      const detail =
+        err instanceof LoginFailedError
+          ? `Could not sign in at ${run.loginUrl}. ${err.message} ${err.hint}`
+          : `Could not sign in at ${run.loginUrl}: ${msg(err)}`;
+      await this.fail(run.id, RunStatus.SCAN_FAILED, detail);
+      return undefined;
+    }
+  }
+
+  /** Decrypt the stored sign-in, or undefined if there is none or it is corrupt. */
+  private loadSession(secret?: { sessionCipher: string | null } | null): StorageState | undefined {
+    if (!secret?.sessionCipher) return undefined;
+    try {
+      return JSON.parse(this.secrets.decrypt(secret.sessionCipher)) as StorageState;
+    } catch {
+      // A key rotation or a truncated row should mean "sign in again", not a
+      // crashed run.
+      this.logger.warn('Stored session could not be decrypted - a fresh sign-in will be used');
+      return undefined;
+    }
+  }
+
+  /**
+   * Sessions are re-established rather than trusted indefinitely.
+   *
+   * Approval is a human step, so a run can sit for hours between the scan and
+   * execution. Most applications expire a session well inside that window, and
+   * running with a dead cookie looks exactly like "the app logged me out",
+   * which would be reported as a product bug.
+   */
+  private sessionIsStale(createdAt: Date | null): boolean {
+    if (!createdAt) return true;
+    return Date.now() - createdAt.getTime() > RunPipelineService.SESSION_MAX_AGE_MS;
+  }
+
+  /**
+   * Delete the stored session once a run is over.
+   *
+   * A live session cookie is as sensitive as the password that produced it, and
+   * a finished run has no reason to keep one. The credentials stay - a rerun
+   * needs them to sign in again.
+   */
+  private async wipeSession(runId: string): Promise<void> {
+    await this.prisma.runSecret
+      .updateMany({
+        where: { runId },
+        data: { sessionCipher: null, sessionCreatedAt: null },
       })
       .catch(() => undefined);
   }
@@ -593,6 +929,7 @@ export function buildSignature(input: {
       [input.testCaseId, input.errorType ?? '', input.failedStepLabel ?? '', normalised].join('|'),
     )
     .digest('hex');
+
 }
 
 function msg(err: unknown): string {

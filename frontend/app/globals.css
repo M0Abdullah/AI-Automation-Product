@@ -5,41 +5,45 @@
    ========================================================================== */
 
 :root {
-  /* Surfaces. A cool near-white ground with white cards floating on it — depth
-     comes from elevation, not from drawing a box around everything. */
-  --bg: #f6f7f9;
-  --bg-tint: #eef0f6;
+  /* Surfaces. Violet-tinted off-white rather than cold blue-grey: the neutrals
+     and the brand then belong to the same family, which is the difference
+     between "designed" and "default admin template". */
+  --bg: #f7f6fc;
+  --bg-tint: #efedf8;
   --surface: #ffffff;
-  --surface-2: #f4f5f8;
-  --surface-3: #e9ebf1;
-  --border: #e8eaf0;
-  --border-strong: #d5d9e2;
+  --surface-2: #f5f3fb;
+  --surface-3: #eae7f5;
+  --border: #e9e5f3;
+  --border-strong: #d7d1e7;
 
-  /* Text — 3 weights only, to stop the page turning into grey soup */
-  --text: #0d1117;
-  --text-dim: #5b6472;
-  --text-faint: #939cab;
+  /* Text - 3 weights only, to stop the page turning into grey soup */
+  --text: #16131f;
+  --text-dim: #5e5872;
+  --text-faint: #948ea8;
 
-  --brand: #5b5bd6;
-  --brand-hover: #4a4ac4;
-  --brand-soft: #eef0fe;
-  --brand-border: #dcdefc;
+  /* Electric violet. Not green, red, amber or blue - in a testing tool those
+     four are spoken for by pass / fail / warn / info, so the brand colour has
+     to sit outside the result palette or a button starts looking like a verdict. */
+  --brand: #6d4aff;
+  --brand-hover: #5c38f0;
+  --brand-soft: #f1edff;
+  --brand-border: #ded4ff;
 
-  --pass: #067647;
-  --pass-bg: #e7f7ee;
-  --pass-border: #a9e0c1;
-  --fail: #c01048;
-  --fail-bg: #fdeef1;
-  --fail-border: #f7c4d0;
-  --warn: #b54708;
-  --warn-bg: #fef6e7;
-  --warn-border: #f7dfae;
-  --info: #175cd3;
-  --info-bg: #eff6ff;
-  --info-border: #bcd7fb;
-  --neutral: #5a6472;
-  --neutral-bg: #f0f2f5;
-  --neutral-border: #dde1e8;
+  --pass: #04804d;
+  --pass-bg: #e6f8ef;
+  --pass-border: #a3e2c1;
+  --fail: #d1155a;
+  --fail-bg: #feeef3;
+  --fail-border: #f9c3d5;
+  --warn: #b45309;
+  --warn-bg: #fff5e6;
+  --warn-border: #f8dda6;
+  --info: #2563eb;
+  --info-bg: #eff4ff;
+  --info-border: #c3d6fd;
+  --neutral: #5f5977;
+  --neutral-bg: #f2f0f8;
+  --neutral-border: #e0dcec;
 
   /* Larger radii read as current; 8px corners are what dated the old build. */
   --radius-lg: 18px;
@@ -49,13 +53,15 @@
 
   /* Layered shadows: a tight contact shadow plus a wide soft one. A single
      flat shadow is what makes cards look pasted on. */
-  --shadow-sm: 0 1px 2px rgba(13, 17, 23, 0.04), 0 1px 3px rgba(13, 17, 23, 0.03);
+  /* Shadows are violet-black, not pure black. A neutral shadow over a tinted
+     ground reads as dirt; a shadow sharing the ground's hue reads as depth. */
+  --shadow-sm: 0 1px 2px rgba(32, 22, 68, 0.05), 0 1px 3px rgba(32, 22, 68, 0.04);
   --shadow:
-    0 1px 2px rgba(13, 17, 23, 0.04), 0 4px 10px -2px rgba(13, 17, 23, 0.06),
-    0 12px 24px -8px rgba(13, 17, 23, 0.05);
+    0 1px 2px rgba(32, 22, 68, 0.05), 0 4px 10px -2px rgba(32, 22, 68, 0.07),
+    0 12px 24px -8px rgba(32, 22, 68, 0.06);
   --shadow-lg:
-    0 2px 4px rgba(13, 17, 23, 0.05), 0 12px 28px -6px rgba(13, 17, 23, 0.1),
-    0 32px 64px -16px rgba(13, 17, 23, 0.14);
+    0 2px 4px rgba(32, 22, 68, 0.06), 0 12px 28px -6px rgba(32, 22, 68, 0.12),
+    0 32px 64px -16px rgba(32, 22, 68, 0.16);
   --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
 
   /* Inter and JetBrains Mono are loaded by next/font in app/layout.tsx. */
@@ -76,42 +82,42 @@
    prefers-color-scheme media query further down. */
 :root[data-theme='dark'],
 :root[data-theme='system'] {
-    --bg: #0a0b0f;
-    --bg-tint: #12141c;
-    --surface: #14161d;
-    --surface-2: #1a1d26;
-    --surface-3: #232733;
-    --border: #23262f;
-    --border-strong: #343947;
+    --bg: #0a0910;
+    --bg-tint: #100e1a;
+    --surface: #151222;
+    --surface-2: #1c182b;
+    --surface-3: #262137;
+    --border: #262135;
+    --border-strong: #38314e;
 
-    --text: #eaeef6;
-    --text-dim: #99a2b3;
-    --text-faint: #69717f;
+    --text: #edebf6;
+    --text-dim: #a19cba;
+    --text-faint: #6f6a87;
 
-    --brand: #8b85ff;
-    --brand-hover: #9d97ff;
-    --brand-soft: #1a1a35;
-    --brand-border: #2e2e5c;
+    --brand: #8b6fff;
+    --brand-hover: #9e86ff;
+    --brand-soft: #1e1735;
+    --brand-border: #382c5e;
 
-    --pass: #47d18c;
-    --pass-bg: #0d2419;
-    --pass-border: #1d5237;
-    --fail: #ff7a94;
-    --fail-bg: #2a1119;
-    --fail-border: #5c2233;
+    --pass: #4ade9b;
+    --pass-bg: #0c2418;
+    --pass-border: #1b5236;
+    --fail: #ff7a9a;
+    --fail-bg: #2b1019;
+    --fail-border: #5e2035;
     --warn: #fbbf4c;
-    --warn-bg: #2a1e0c;
-    --warn-border: #58411a;
-    --info: #6ba5ff;
-    --info-bg: #101f38;
+    --warn-bg: #2b1e0c;
+    --warn-border: #59411a;
+    --info: #6fa8ff;
+    --info-bg: #101e38;
     --info-border: #234066;
-    --neutral: #9aa5b8;
-    --neutral-bg: #1c212b;
-    --neutral-border: #2c333f;
+    --neutral: #a29eb8;
+    --neutral-bg: #1d1a2a;
+    --neutral-border: #2f2a3f;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -4px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.5), 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 1px 2px rgba(4, 2, 12, 0.6);
+    --shadow: 0 1px 2px rgba(4, 2, 12, 0.5), 0 8px 20px -4px rgba(4, 2, 12, 0.6);
+    --shadow-lg: 0 2px 6px rgba(4, 2, 12, 0.6), 0 24px 56px -12px rgba(4, 2, 12, 0.78);
     --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
 }
 
@@ -119,35 +125,35 @@
    explicitly bypasses this entirely. */
 @media (prefers-color-scheme: light) {
   :root[data-theme='system'] {
-    --bg: #f6f7f9;
-    --bg-tint: #eef0f6;
+    --bg: #f7f6fc;
+    --bg-tint: #efedf8;
     --surface: #ffffff;
-    --surface-2: #f4f5f8;
-    --surface-3: #e9ebf1;
-    --border: #e8eaf0;
-    --border-strong: #d5d9e2;
-    --text: #0d1117;
-    --text-dim: #5b6472;
-    --text-faint: #939cab;
-    --brand: #5b5bd6;
-    --brand-hover: #4a4ac4;
-    --brand-soft: #eef0fe;
-    --brand-border: #dcdefc;
-    --pass: #067647;
-    --pass-bg: #e7f7ee;
-    --pass-border: #a9e0c1;
-    --fail: #c01048;
-    --fail-bg: #fdeef1;
-    --fail-border: #f7c4d0;
-    --warn: #b54708;
-    --warn-bg: #fef6e7;
-    --warn-border: #f7dfae;
-    --info: #175cd3;
-    --info-bg: #eff6ff;
-    --info-border: #bcd7fb;
-    --neutral: #5b6472;
-    --neutral-bg: #f0f2f5;
-    --neutral-border: #dde1e8;
+    --surface-2: #f5f3fb;
+    --surface-3: #eae7f5;
+    --border: #e9e5f3;
+    --border-strong: #d7d1e7;
+    --text: #16131f;
+    --text-dim: #5e5872;
+    --text-faint: #948ea8;
+    --brand: #6d4aff;
+    --brand-hover: #5c38f0;
+    --brand-soft: #f1edff;
+    --brand-border: #ded4ff;
+    --pass: #04804d;
+    --pass-bg: #e6f8ef;
+    --pass-border: #a3e2c1;
+    --fail: #d1155a;
+    --fail-bg: #feeef3;
+    --fail-border: #f9c3d5;
+    --warn: #b45309;
+    --warn-bg: #fff5e6;
+    --warn-border: #f8dda6;
+    --info: #2563eb;
+    --info-bg: #eff4ff;
+    --info-border: #c3d6fd;
+    --neutral: #5f5977;
+    --neutral-bg: #f2f0f8;
+    --neutral-border: #e0dcec;
     --shadow-sm: 0 1px 2px rgba(13, 17, 23, 0.04), 0 1px 3px rgba(13, 17, 23, 0.03);
     --shadow:
       0 1px 2px rgba(13, 17, 23, 0.04), 0 4px 10px -2px rgba(13, 17, 23, 0.06),
@@ -1078,6 +1084,24 @@ textarea::placeholder {
   opacity: 0.5;
 }
 
+/* A tinted disc behind the icon. A bare outline glyph on a dark card reads as
+   a rendering failure; giving it a surface makes it read as intentional. */
+/* Block-level and auto-centred. As inline-flex it sat on the same line as the
+   heading that follows it, which read as an icon glued to the text. */
+.empty-mark {
+  display: flex;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+}
+
 .spinner {
   width: 13px;
   height: 13px;
@@ -1441,57 +1465,32 @@ details.collapse > summary::marker {
   transition: width 0.4s ease;
 }
 
-/* Modern product shell: a calmer QA control centre shared by every screen. */
+/* Modern product shell: a calmer QA control centre shared by every screen.
+
+   COLOURS ARE NOT REDEFINED HERE. An earlier version of this block re-declared
+   --brand, --bg and friends, which silently overrode the palette at the top of
+   the file and made every change there a no-op. Layout and elevation only. */
 :root {
-  --brand: #6d5dfc;
-  --brand-hover: #5b4be8;
-  --brand-soft: #f0edff;
-  --brand-border: #dcd6ff;
-  --bg: #f5f6fa;
-  --bg-tint: #ecebff;
-  --surface: rgba(255, 255, 255, 0.92);
-  --surface-2: #f5f5f9;
-  --surface-3: #ececf3;
-  --border: #e4e5ec;
-  --border-strong: #d4d6e0;
-  --text: #151523;
-  --text-dim: #626779;
-  --text-faint: #9298a9;
   --sidebar-w: 264px;
   --header-h: 68px;
   --radius-lg: 22px;
   --radius: 16px;
-  --shadow-sm: 0 1px 2px rgba(17, 17, 35, 0.04), 0 6px 18px rgba(17, 17, 35, 0.035);
-  --shadow: 0 2px 4px rgba(17, 17, 35, 0.04), 0 18px 42px rgba(17, 17, 35, 0.08);
-}
-
-:root[data-theme='dark'] {
-  --bg: #0b0c12;
-  --bg-tint: #19172c;
-  --surface: rgba(20, 21, 31, 0.92);
-  --surface-2: #1a1b27;
-  --surface-3: #242535;
-  --border: #292b3a;
-  --border-strong: #393b4f;
-  --text: #f3f3f8;
-  --text-dim: #a3a6b7;
-  --text-faint: #747889;
-  --brand: #9387ff;
-  --brand-hover: #a69dff;
-  --brand-soft: #211e42;
-  --brand-border: #3c356f;
+  --surface-glass: color-mix(in srgb, var(--surface) 92%, transparent);
 }
 
 body {
   background:
     radial-gradient(900px 540px at 74% -12%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 72%),
-    radial-gradient(700px 500px at 102% 36%, color-mix(in srgb, #20c8b0 6%, transparent), transparent 70%),
+    radial-gradient(760px 520px at 100% 34%, color-mix(in srgb, #e879b8 7%, transparent), transparent 70%),
     var(--bg);
 }
 
+/* A permanently dark rail beside a light canvas is deliberate - it anchors the
+   page and keeps navigation out of the reading area. It is violet-black rather
+   than blue-black so it belongs to the same family as the brand. */
 .sidebar {
-  background: #10111a;
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, #16122a 0%, #100d1e 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   padding: 20px 15px;
   color: #fff;
 }
@@ -1501,8 +1500,8 @@ body {
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: linear-gradient(145deg, #8a7cff 8%, #6958f5 52%, #3dd6c6);
-  box-shadow: 0 10px 24px rgba(105, 88, 245, 0.32), inset 0 1px rgba(255, 255, 255, 0.3);
+  background: linear-gradient(145deg, #a78bff 6%, #7c5cff 48%, #e879b8);
+  box-shadow: 0 10px 26px rgba(124, 92, 255, 0.38), inset 0 1px rgba(255, 255, 255, 0.32);
 }
 .brand-pulse { width: 15px; height: 15px; border: 3px solid #fff; border-radius: 50%; position: relative; }
 .brand-pulse::after {
@@ -1512,28 +1511,28 @@ body {
   height: 5px;
   right: -5px;
   top: -5px;
-  background: #9ff6e8;
-  border: 2px solid #6d5dfc;
+  background: #f0abfc;
+  border: 2px solid #7c5cff;
   border-radius: 50%;
 }
 .brand-copy { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-copy strong { font-size: 15.5px; letter-spacing: -0.02em; }
-.brand-copy small { margin-top: 4px; color: #7f8397; font-size: 10.5px; font-weight: 500; letter-spacing: 0.02em; }
-.nav-label { color: #5f6376; padding-left: 11px; }
-.nav-item { color: #989caf; padding: 9px 11px; margin: 2px 0; }
+.brand-copy small { margin-top: 4px; color: #8b83a8; font-size: 10.5px; font-weight: 500; letter-spacing: 0.02em; }
+.nav-label { color: #6b6488; padding-left: 11px; }
+.nav-item { color: #a49dbe; padding: 9px 11px; margin: 2px 0; }
 .nav-item:hover { color: #fff; background: rgba(255, 255, 255, 0.055); }
 .nav-item-active {
   color: #fff;
-  background: linear-gradient(90deg, rgba(109, 93, 252, 0.24), rgba(109, 93, 252, 0.08));
-  box-shadow: inset 3px 0 #8d82ff;
+  background: linear-gradient(90deg, rgba(124, 92, 255, 0.30), rgba(124, 92, 255, 0.06));
+  box-shadow: inset 3px 0 #a78bff;
 }
-.nav-item-active .nav-icon { color: #a9a1ff; }
-.nav-count { background: rgba(255,255,255,.09); color: #c8cad5; }
+.nav-item-active .nav-icon { color: #c4b5fd; }
+.nav-count { background: rgba(255,255,255,.09); color: #cdc7e0; }
 .sidebar-footer { border-color: rgba(255, 255, 255, 0.08); }
 .user-chip { color: #fff; }
 .user-chip:hover { background: rgba(255,255,255,.055); }
-.user-role { color: #777b8e; }
-.avatar { background: linear-gradient(145deg, #2e3040, #1c1e29); color: #bcb5ff; border-color: #3b3d50; }
+.user-role { color: #837c9e; }
+.avatar { background: linear-gradient(145deg, #322a4d, #221c36); color: #c4b5fd; border-color: #423860; }
 .topbar { padding: 0 30px; background: color-mix(in srgb, var(--bg) 78%, transparent); }
 .topbar-title { font-size: 14px; }
 .topbar-identity { color: var(--text-faint); font-size: 12px; white-space: nowrap; }
@@ -1542,18 +1541,26 @@ body {
 .page-hero h1 { margin-top: 5px; font-size: clamp(27px, 3vw, 36px); letter-spacing: -0.04em; }
 .eyebrow { color: var(--brand); font-size: 11px; line-height: 1; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 .page-subtitle { display: block; color: var(--text-dim); margin-top: 7px; max-width: 680px; }
-.card { border-color: color-mix(in srgb, var(--border) 88%, transparent); box-shadow: var(--shadow-sm); backdrop-filter: blur(16px); }
+/* Slightly translucent so the blur has something to do - the page's gradient
+   wash shows faintly through, which is what stops a flat card looking pasted
+   on. An opaque surface with backdrop-filter is pure GPU cost for no effect. */
+.card {
+  background: var(--surface-glass);
+  border-color: color-mix(in srgb, var(--border) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px) saturate(120%);
+}
 .card:hover { border-color: var(--border-strong); }
 .card-head h2 { font-size: 17px; }
 .stat { border: 1px solid transparent; border-radius: 12px; }
 .stat:hover { border-color: var(--border); background: var(--surface); }
 .btn { min-height: 38px; }
 .btn-primary {
-  background: linear-gradient(135deg, #7b6cff, #5d4bea);
+  background: linear-gradient(135deg, #8b6fff, #6535f5);
   border-color: transparent;
-  box-shadow: 0 8px 22px rgba(93, 75, 234, 0.27), inset 0 1px rgba(255,255,255,.25);
+  box-shadow: 0 8px 22px rgba(109, 74, 255, 0.30), inset 0 1px rgba(255, 255, 255, 0.26);
 }
-.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #8b7eff, #6957ef); border-color: transparent; transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #9c85ff, #7448ff); border-color: transparent; transform: translateY(-1px); }
 .btn-lg { min-height: 46px; padding-inline: 19px; }
 input[type='text'], input[type='url'], input[type='email'], input[type='password'], input[type='date'], select, textarea {
   min-height: 44px;
@@ -1569,21 +1576,33 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
   gap: 16px;
   align-items: start;
 }
+/* WHICH CARDS SPAN THE FULL WIDTH.
+   Previously "Your own rules" and "Test login" shared a row while Figma sat
+   alone on the left, so an empty Test login card left a hole beside the rules
+   box and a second hole beside Figma. The two OPTIONAL cards - Test login and
+   Figma - are the ones that pair naturally: both are small, both are often
+   collapsed, and side by side an empty one is balanced by its neighbour. */
 .test-composer > .banner,
 .composer-url,
 .composer-checks,
+.composer-rules,
 .composer-submit { grid-column: 1 / -1; }
+.composer-login,
+.composer-figma { grid-column: span 1; }
 .composer-url { padding: 18px 22px; }
 .composer-url .step-head { margin-bottom: 12px; }
 .composer-url input { height: 54px; font-size: 16px; padding-inline: 18px; }
-.composer-checks .check-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Two columns, not three. The catalogue groups hold 5 / 2 / 2 / 2 / 2 checks,
+   so a three-column grid strands a lone tile on almost every group and the
+   right-hand third of the card reads as missing content. */
+.composer-checks .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .composer-rules textarea { min-height: 185px; }
 .composer-login { height: 100%; }
 .composer-submit {
   display: grid;
   grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr);
   gap: 12px 18px;
-  align-items: end;
+  align-items: start;
 }
 .composer-submit > .field { grid-row: 1 / 3; margin: 0 !important; }
 .composer-submit > .checkbox { margin: 0; }
@@ -1593,23 +1612,23 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
 .suite-health-card {
   color: #fff;
   background:
-    radial-gradient(500px 220px at 100% 0%, rgba(88, 220, 202, .16), transparent 70%),
-    linear-gradient(135deg, #181928, #11121c);
+    radial-gradient(520px 240px at 100% 0%, rgba(167, 139, 250, .20), transparent 70%),
+    linear-gradient(135deg, #1c1733, #120f22);
   border-color: rgba(255,255,255,.06);
   box-shadow: 0 22px 50px rgba(19, 18, 40, .18);
 }
 .suite-health-card .faint,
-.suite-health-card .stat-label { color: #9296aa; }
+.suite-health-card .stat-label { color: #a099bd; }
 .suite-health-card .stat { background: rgba(255,255,255,.055); }
 .suite-health-card .stat:hover { background: rgba(255,255,255,.085); border-color: rgba(255,255,255,.08); }
 
 @media (max-width: 860px) {
-  .sidebar { background: #10111a; padding: 12px; }
+  .sidebar { background: linear-gradient(90deg, #16122a, #100d1e); padding: 12px; }
   .brand { padding: 2px 8px; margin-right: auto; }
   .brand-copy small, .sidebar-footer, .topbar-identity, .topbar > .faint { display: none; }
   .nav-item { padding: 9px; }
   .nav-item span:not(.nav-icon):not(.nav-count) { display: none; }
-  .nav-item-active { box-shadow: inset 0 -2px #8d82ff; }
+  .nav-item-active { box-shadow: inset 0 -2px #a78bff; }
   .topbar { padding: 0 16px; }
   .content { padding: 24px 16px 40px; }
   .test-composer { grid-template-columns: 1fr; }
@@ -1624,4 +1643,87 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
   .page-hero .btn { width: 100%; }
   .brand-copy strong { font-size: 14px; }
   .composer-checks .check-grid { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   EMPTY DASHBOARD
+   The first screen a new account sees. It used to be one small box adrift in
+   half a page of nothing; it now carries the three-step flow, which both
+   explains the product and gives the page a reason to occupy its own height.
+   ========================================================================== */
+.onboard {
+  display: grid;
+  gap: 18px;
+}
+
+.onboard-head {
+  text-align: center;
+  padding: 40px 28px 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(620px 260px at 50% -30%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%),
+    var(--surface-glass);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-sm);
+}
+.onboard-head h2 {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+  margin: 0 0 8px;
+}
+.onboard-head p {
+  color: var(--text-dim);
+  max-width: 520px;
+  margin: 0 auto 20px;
+}
+.onboard-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(145deg, #a78bff 6%, #7c5cff 52%, #e879b8);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--brand) 36%, transparent);
+}
+
+/* auto-fit so three steps become one column on a narrow window without a
+   separate breakpoint. */
+.onboard-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.onboard-step {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.onboard-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 3px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+}
+.onboard-foot {
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  max-width: 640px;
+  margin: 2px auto 0;
 }

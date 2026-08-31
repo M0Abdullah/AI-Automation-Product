@@ -1,6 +1,8 @@
 import { tokenStore, type AuthUser } from './auth';
 import type {
   CheckOption,
+  ContentIssue,
+  DesignIssue,
   DashboardOverview,
   Finding,
   FindingStatus,
@@ -177,6 +179,20 @@ export interface CreateRunInput {
   checks?: string[];
   name?: string;
   credentials?: { email?: string; password?: string };
+  /**
+   * Sign-in page, for a target that sits behind a login. Given this plus
+   * credentials, the backend signs in once before scanning and reuses that
+   * session for every test. Must be on the same origin as `url`.
+   */
+  loginUrl?: string;
+  /** Figma file key, or the whole Figma URL - the backend parses either. */
+  figmaFileKey?: string;
+  /** Figma node id ("18:0"), or the whole URL containing node-id=. */
+  figmaNodeId?: string;
+  /** Explicit control labels, when the sign-in form cannot be auto-detected. */
+  loginEmailField?: string;
+  loginPassField?: string;
+  loginSubmit?: string;
   authorized: boolean;
   allowDestructive?: boolean;
 }
@@ -187,6 +203,42 @@ export const createRun = (input: CreateRunInput) =>
 export const listRuns = () => request<RunListItem[]>('/runs');
 
 export const getRun = (id: string) => request<RunDetail>(`/runs/${id}`);
+
+/**
+ * Review an advisory content issue.
+ *
+ * DISMISSED means "that is our brand name / jargon, stop showing me this" and is
+ * stored server-side, so the same word does not come back on the next run.
+ */
+/**
+ * Turn a confirmed wording problem into a real defect with a BUG id.
+ *
+ * Detection stays advisory; this is the human saying "yes, that is a bug". That
+ * separation is what keeps the platform's no-false-bugs record intact.
+ */
+export const promoteContentIssue = (id: string, body?: { title?: string; severity?: string }) =>
+  request<{ findingId: string; bugKey: string | null; alreadyExisted: boolean }>(
+    `/content-issues/${id}/promote`,
+    { method: 'POST', body: JSON.stringify(body ?? {}) },
+  );
+
+export const reviewDesignIssue = (id: string, status: 'NEW' | 'ACCEPTED' | 'DISMISSED') =>
+  request<DesignIssue>(`/design-issues/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+
+export const promoteDesignIssue = (id: string, body?: { title?: string; severity?: string }) =>
+  request<{ findingId: string; bugKey: string | null; alreadyExisted: boolean }>(
+    `/design-issues/${id}/promote`,
+    { method: 'POST', body: JSON.stringify(body ?? {}) },
+  );
+
+export const reviewContentIssue = (id: string, status: 'NEW' | 'ACCEPTED' | 'DISMISSED') =>
+  request<ContentIssue>(`/content-issues/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 
 export const executeRun = (id: string) =>
   request<{ started: boolean; approvedCount: number }>(`/runs/${id}/execute`, { method: 'POST' });

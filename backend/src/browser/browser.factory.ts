@@ -10,6 +10,15 @@ import { AppConfigService } from '../config/app-config.service';
  * cannot leak state into each other - which is exactly the isolation the
  * product needs, at a fraction of the cost of a browser per test.
  */
+/**
+ * Playwright's storageState input shape, derived from Playwright itself so it
+ * cannot drift. Cookies plus per-origin localStorage - everything that makes a
+ * browser "signed in".
+ */
+export type StorageState = NonNullable<
+  NonNullable<Parameters<Browser['newContext']>[0]>['storageState']
+>;
+
 @Injectable()
 export class BrowserFactory implements OnModuleDestroy {
   private readonly logger = new Logger(BrowserFactory.name);
@@ -89,12 +98,19 @@ export class BrowserFactory implements OnModuleDestroy {
   }
 
   /** A fresh, isolated context. Always close it in a finally block. */
-  async newContext(): Promise<BrowserContext> {
+  /**
+   * @param storageState Cookies and localStorage captured from an earlier
+   *   sign-in. Passing it is what makes pages behind a login testable: without
+   *   it every context starts logged out, so a protected URL simply redirects
+   *   to the login page and every assertion about that page is meaningless.
+   */
+  async newContext(storageState?: StorageState): Promise<BrowserContext> {
     const browser = await this.getBrowser();
     const { viewport, navigationTimeout, actionTimeout } = this.config.browser;
 
     const context = await browser.newContext({
       viewport,
+      storageState,
       ignoreHTTPSErrors: true, // staging environments often use self-signed certs
       locale: 'en-US',
       // Identify the tool honestly in logs of the site under test.

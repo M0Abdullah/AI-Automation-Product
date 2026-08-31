@@ -16,6 +16,7 @@ import { CreateTicketDialog } from './CreateTicketDialog';
 import { ResultEvidence } from './ResultEvidence';
 import { ScreenshotPanel } from './ScreenshotPanel';
 import {
+  CategoryBadge,
   ClassificationBadge,
   FindingStatusBadge,
   PriorityBadge,
@@ -181,6 +182,7 @@ export function FindingCard({
               confidence={finding.aiConfidence}
               ai
             />
+            <CategoryBadge value={finding.aiCategory} />
             <span className="faint">Suggestion only. You decide.</span>
           </div>
           {finding.aiSummary && <div>{finding.aiSummary}</div>}

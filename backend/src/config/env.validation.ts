@@ -61,6 +61,13 @@ export const envSchema = z.object({
     .pipe(z.number().min(0).max(2)),
   LLM_TIMEOUT_MS: int(90000, 5000),
 
+  // ------------------------------------------------------------------ FIGMA
+  // Optional: without a token the design comparison is simply unavailable and
+  // every other check keeps working. A missing integration must never stop the
+  // platform from booting.
+  FIGMA_TOKEN: z.string().optional(),
+  FIGMA_TIMEOUT_MS: int(20000, 3000),
+
   // --- auth ---
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   /// Access tokens are short-lived; the refresh token in the DB does the rest.

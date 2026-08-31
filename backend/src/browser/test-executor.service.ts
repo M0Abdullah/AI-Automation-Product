@@ -11,7 +11,7 @@ import type {
 } from '../common/test-plan.types';
 import { executeStep, type ActionContext } from './action-handlers';
 import { runAssertion } from './assertion-handlers';
-import { BrowserFactory } from './browser.factory';
+import { BrowserFactory, type StorageState } from './browser.factory';
 import {
   AssertionFailedError,
   ExecutableTestCase,
@@ -49,6 +49,12 @@ export class TestExecutorService {
     values: Record<string, string>;
     runId: string;
     attempt: number;
+    /**
+     * A sign-in established once for the whole run. Every test gets the same
+     * one, so none of them has to log in for itself - which is what makes a
+     * page behind a login testable at all.
+     */
+    storageState?: StorageState;
   }): Promise<ExecutionOutcome> {
     const { testCase, startUrl, values, runId, attempt } = args;
     const startedAt = new Date();
@@ -71,7 +77,7 @@ export class TestExecutorService {
     let tracePath: string | undefined;
     let finalUrl: string | undefined;
 
-    const context = await this.browsers.newContext();
+    const context = await this.browsers.newContext(args.storageState);
     const traceEnabled = this.config.captureTraceOnFailure;
     if (traceEnabled) {
       await context.tracing.start({ screenshots: true, snapshots: true, sources: false });

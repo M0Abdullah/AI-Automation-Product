@@ -59,11 +59,21 @@ export default function RunsPage() {
 
       {!loading && runs.length === 0 && !error && (
         <div className="card empty">
-          <div className="empty-icon">▶</div>
-          <div>No runs yet.</div>
-          <div className="faint" style={{ marginTop: 6 }}>
-            Start one from the New run screen.
+          {/* An inline mark rather than a bare glyph - the old play triangle
+              rendered as a grey wedge that read as a broken image. */}
+          <span className="empty-mark" aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 8v4l3 2" />
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+          </span>
+          <strong>No runs yet</strong>
+          <div className="faint" style={{ marginTop: 4 }}>
+            Every run you start will appear here, newest first.
           </div>
+          <Link href="/runs/new" className="btn btn-primary" style={{ marginTop: 14 }}>
+            Test a page
+          </Link>
         </div>
       )}
 

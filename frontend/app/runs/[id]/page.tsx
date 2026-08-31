@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { ContentIssuesPanel } from '../../../components/ContentIssuesPanel';
+import { DesignIssuesPanel } from '../../../components/DesignIssuesPanel';
 import { FindingCard } from '../../../components/FindingCard';
 import { PageScanPanel } from '../../../components/PageScanPanel';
 import { RunStatusBadge } from '../../../components/StatusBadge';
@@ -30,7 +32,7 @@ import { IN_PROGRESS_STATUSES, type RunDetail } from '../../../lib/types';
  * not things you read every time.
  */
 
-type Tab = 'cases' | 'failures' | 'details';
+type Tab = 'cases' | 'failures' | 'wording' | 'design' | 'details';
 
 export default function RunPage() {
   const params = useParams<{ id: string }>();
@@ -112,6 +114,14 @@ export default function RunPage() {
   const openFindings = run.findings.filter((f) =>
     ['NEW', 'TRIAGED', 'REOPENED'].includes(f.status),
   );
+  // Dismissed suggestions do not count towards the tab badge - once a reviewer
+  // has said "that is our product name", it should stop asking for attention.
+  const wordingCount = (run.contentIssues ?? []).filter((i) => i.status !== 'DISMISSED').length;
+  // The Design tab appears whenever a Figma frame was given, even with zero
+  // mismatches - "it matches the design" is a result worth seeing, and hiding
+  // the tab would leave the user unsure the check ran at all.
+  const designRan = Boolean(run.figmaFileKey && run.figmaNodeId);
+  const designCount = (run.designIssues ?? []).filter((i) => i.status !== 'DISMISSED').length;
   const hasRun = s.executed > 0;
   const allGood = hasRun && s.failed === 0 && s.errored === 0 && s.flaky === 0;
 
@@ -282,6 +292,18 @@ export default function RunPage() {
             <span className="badge badge-warn">{openFindings.length} to review</span>
           )}
         </TabButton>
+        {/* Only offered when there is something to review. An always-visible
+            empty tab trains people to ignore it. */}
+        {wordingCount > 0 && (
+          <TabButton current={tab} id="wording" onClick={setTab} count={wordingCount}>
+            Wording
+          </TabButton>
+        )}
+        {designRan && (
+          <TabButton current={tab} id="design" onClick={setTab} count={designCount}>
+            Design
+          </TabButton>
+        )}
         <TabButton current={tab} id="details" onClick={setTab}>
           Details
         </TabButton>
@@ -322,6 +344,24 @@ export default function RunPage() {
         </div>
       )}
 
+      {/* ----------------------------------------------------------- wording */}
+      {tab === 'wording' && (
+        <div className="card">
+          <ContentIssuesPanel issues={run.contentIssues ?? []} onPromoted={load} />
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------ design */}
+      {tab === 'design' && (
+        <div className="card">
+          <DesignIssuesPanel
+            issues={run.designIssues ?? []}
+            summary={run.designSpecSummary}
+            onPromoted={load}
+          />
+        </div>
+      )}
+
       {/* ----------------------------------------------------------- details */}
       {tab === 'details' && (
         <div className="stack">
@@ -338,6 +378,24 @@ export default function RunPage() {
                 No written requirements — this run used the tick-box checks only.
               </div>
             )}
+            {/* Proof the sign-in worked. Without this the user has no way to
+                tell whether the tests ran as a signed-in user or as a visitor,
+                which is the difference between a real result and a page of
+                assertions about a login screen. */}
+            {run.loginUrl && (
+              <div className="card card-tight" style={{ marginTop: 12, background: 'var(--surface-2)' }}>
+                <div className="row" style={{ marginBottom: 4 }}>
+                  <span className="badge badge-pass">Signed in first</span>
+                  <span className="mono faint">{run.loginUrl}</span>
+                </div>
+                <div className="faint">
+                  {run.sessionEvidence
+                    ? `Confirmed: ${run.sessionEvidence}. The same session was reused for every test.`
+                    : 'Signing in — the tests will run as this user.'}
+                </div>
+              </div>
+            )}
+
             <div className="row faint" style={{ marginTop: 12 }}>
               <span className="pill">{run.hasCredentials ? 'login saved' : 'no login'}</span>
               <span className="pill">

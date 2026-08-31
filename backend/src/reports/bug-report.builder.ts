@@ -21,6 +21,8 @@ export interface BugReportData {
   build?: string | null;
   classification?: string | null;
   aiClassification?: string | null;
+  /** WHAT KIND of defect (UI_VISUAL, DATA, ...). Routes the bug to the right team. */
+  aiCategory?: string | null;
   aiConfidence?: number | null;
   aiSummary?: string | null;
   aiSuspectedCause?: string | null;
@@ -33,15 +35,17 @@ export interface BugReportData {
 
   requirement?: string | null;
   testCaseTitle: string;
-  testCasePriority: string;
+  /** Null for a finding that did not come from a test case (content, design). */
+  testCasePriority: string | null;
 
   environment: {
     url: string;
     runName: string;
-    browser: string;
-    browserVersion?: string | null;
-    viewport?: string | null;
-    finalUrl?: string | null;
+    /** Null when the finding did not come from a browser run. */
+    browser: string | null;
+    browserVersion: string | null;
+    viewport: string | null;
+    finalUrl: string | null;
   };
 
   failure: {
@@ -50,8 +54,9 @@ export interface BugReportData {
     expected?: string | null;
     actual?: string | null;
     failedStepLabel?: string | null;
-    durationMs: number;
-    attempt: number;
+    /** Null when the finding is not from a browser run. */
+    durationMs: number | null;
+    attempt: number | null;
   };
 
   steps: StepResult[];
@@ -154,6 +159,7 @@ export function renderMarkdown(d: BugReportData): string {
     row('Module', d.module),
     row('Build', d.build),
     row('Classification', d.classification ?? d.aiClassification),
+    row('Category', categoryLabel(d.aiCategory)),
     row('Reproducibility', `${d.occurrences} occurrence(s)`),
     row('Reported', d.createdAt.toISOString()),
     row('Last seen', d.lastSeenAt.toISOString()),
@@ -496,6 +502,7 @@ export function renderHtml(d: BugReportData): string {
   ${kv('Test case', d.testCaseTitle)}
   ${kv('Requirement', d.requirement)}
   ${kv('Classification', d.classification ?? d.aiClassification)}
+  ${kv('Category', categoryLabel(d.aiCategory))}
   ${kv('Reported', d.createdAt.toISOString())}
   ${kv('Last seen', d.lastSeenAt.toISOString())}
   ${kv('Triaged by', d.triagedBy)}
@@ -559,4 +566,22 @@ ${
 </footer>
 </div>
 </body></html>`;
+}
+
+/**
+ * Human wording for the defect category. The raw enum is fine in an API payload
+ * but a bug report gets read by developers and managers, and "UI_VISUAL" in a
+ * PDF looks like a leaked database value.
+ */
+function categoryLabel(value?: string | null): string | undefined {
+  if (!value || value === 'UNKNOWN') return undefined;
+  const map: Record<string, string> = {
+    FUNCTIONAL: 'Functional - the app behaved incorrectly',
+    TECHNICAL: 'Technical - crash, failed request or timeout',
+    DATA: 'Data - wrong or missing values on screen',
+    CONTENT: 'Content - wording, label or typo',
+    UI_VISUAL: 'UI / visual - layout, visibility or placement',
+    LOADING: 'Loading - a spinner or skeleton never resolved',
+  };
+  return map[value] ?? value;
 }

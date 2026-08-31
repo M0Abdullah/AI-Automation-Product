@@ -107,6 +107,42 @@ export function ClassificationBadge({
   );
 }
 
+/**
+ * WHAT KIND of defect. Sits beside ClassificationBadge, which says whose fault
+ * it is - the two answer different questions and a triager needs both.
+ *
+ * Deliberately quiet styling: the classification badge is the one that drives
+ * the decision, and two loud badges side by side read as one confused label.
+ */
+const CATEGORY_LABEL: Record<string, string> = {
+  FUNCTIONAL: 'Functional',
+  TECHNICAL: 'Technical',
+  DATA: 'Data',
+  CONTENT: 'Content',
+  UI_VISUAL: 'UI / visual',
+  LOADING: 'Loading',
+  UNKNOWN: 'Uncategorised',
+};
+
+const CATEGORY_ICON: Record<string, string> = {
+  FUNCTIONAL: '⚙',   // gear - behaviour
+  TECHNICAL: '⚡',    // bolt - crash / request
+  DATA: '▤',         // rows - values
+  CONTENT: '“',      // quote - wording
+  UI_VISUAL: '◱',    // shaded box - layout
+  LOADING: '◌',      // dotted circle - spinner
+  UNKNOWN: '?',
+};
+
+export function CategoryBadge({ value }: { value?: string | null }) {
+  if (!value || value === 'UNKNOWN') return null;
+  return (
+    <span className="badge badge-neutral" title="What kind of defect this is">
+      {CATEGORY_ICON[value] ?? ''} {CATEGORY_LABEL[value] ?? value}
+    </span>
+  );
+}
+
 /** Ticket lifecycle colours. READY_FOR_RETEST is brand-coloured because it is
  *  the handoff back to QA - the state somebody must act on. */
 const TICKET_TONE: Record<TicketStatus, Tone> = {

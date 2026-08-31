@@ -35,6 +35,13 @@ export function RunForm() {
   const [authorized, setAuthorized] = useState(false);
   const [allowDestructive, setAllowDestructive] = useState(false);
   const [showCreds, setShowCreds] = useState(false);
+  // Sign-in URL. When set, the platform logs in once BEFORE scanning and reuses
+  // that session for every test - the only way to test a page behind a login.
+  const [loginUrl, setLoginUrl] = useState('');
+  // Figma design to check the page against. One paste of the Figma URL fills
+  // both - the backend pulls the file key and node id out of it.
+  const [figmaUrl, setFigmaUrl] = useState('');
+  const [showFigma, setShowFigma] = useState(false);
 
   const [options, setOptions] = useState<CheckOption[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -71,6 +78,12 @@ export function RunForm() {
         name: name.trim() || undefined,
         authorized,
         allowDestructive,
+        loginUrl: loginUrl.trim() || undefined,
+        // Same string for both: the backend extracts the file key from the path
+        // and the node id from the query. Asking a user to split it by hand is
+        // a needless way to get a support ticket.
+        figmaFileKey: figmaUrl.trim() || undefined,
+        figmaNodeId: figmaUrl.trim() || undefined,
         credentials: hasCredentials
           ? { email: email.trim() || undefined, password: password || undefined }
           : undefined,
@@ -184,7 +197,7 @@ export function RunForm() {
           <div>
             <h2>Test login</h2>
             <span className="faint">
-              Optional. Needed only for the two login checks.
+              Optional. Needed for the login checks, and for any page behind a sign-in.
             </span>
           </div>
           <button
@@ -226,10 +239,80 @@ export function RunForm() {
                 />
               </label>
             </div>
+
+            {/* The sign-in URL is what unlocks pages behind a login. Kept in
+                this card because it is useless without the credentials above. */}
+            <label className="field" style={{ marginTop: 14, marginBottom: 0 }}>
+              <span className="field-label">
+                Sign-in page URL <span className="faint">— only for pages behind a login</span>
+              </span>
+              <input
+                type="url"
+                autoComplete="off"
+                placeholder="https://example.com/login"
+                value={loginUrl}
+                onChange={(e) => setLoginUrl(e.target.value)}
+              />
+              <span className="field-hint">
+                Leave empty to test the page as a visitor. Fill it in and we sign in{' '}
+                <strong>once</strong> before reading the page, then reuse that session for
+                every test — otherwise a protected URL just redirects to the login screen
+                and every test describes the wrong page. Must be on the same site.
+              </span>
+            </label>
           </>
         ) : (
           <span className="faint">
-            {hasCredentials ? 'Credentials saved for this run.' : 'No credentials — login checks are off.'}
+            {hasCredentials
+              ? loginUrl.trim()
+                ? `Credentials saved. Will sign in at ${loginUrl.trim()} before testing.`
+                : 'Credentials saved for this run.'
+              : 'No credentials — login checks are off.'}
+          </span>
+        )}
+      </div>
+
+      {/* ------------------------------------------------------- 5. figma */}
+      <div className="card composer-figma">
+        <div className="step-head">
+          <span className="step-num">5</span>
+          <div>
+            <h2>Match against Figma</h2>
+            <span className="faint">
+              Optional. Checks the page against your design&apos;s sizes, radii, type and fonts.
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => setShowFigma((v) => !v)}
+          >
+            {showFigma ? 'Hide' : figmaUrl.trim() ? 'Edit' : 'Add'}
+          </button>
+        </div>
+
+        {showFigma ? (
+          <label className="field" style={{ marginBottom: 0 }}>
+            <span className="field-label">Figma frame URL</span>
+            <input
+              type="url"
+              autoComplete="off"
+              placeholder="https://www.figma.com/design/AbC123/My-File?node-id=18-0"
+              value={figmaUrl}
+              onChange={(e) => setFigmaUrl(e.target.value)}
+            />
+            <span className="field-hint">
+              Open the frame in Figma and copy the address bar &mdash; it needs the{' '}
+              <code>node-id</code> on the end, so we read that frame and not the whole file.
+              We read the design&apos;s button heights, corner radii, type scale and fonts,
+              then flag anything on the page that is a pixel or two off. Findings are
+              suggestions, never automatic bugs.
+            </span>
+          </label>
+        ) : (
+          <span className="faint">
+            {figmaUrl.trim() ? 'Design comparison is on for this run.' : 'No design comparison.'}
           </span>
         )}
       </div>

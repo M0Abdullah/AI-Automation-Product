@@ -37,6 +37,20 @@ export class AppConfigService {
   }
 
   // --- llm ---
+  /**
+   * Figma is optional. `enabled` is what callers should check - it keeps the
+   * "is the integration configured" question in one place instead of every call
+   * site testing the token for emptiness.
+   */
+  get figma() {
+    const token = this.config.get<string>('FIGMA_TOKEN')?.trim() ?? '';
+    return {
+      token,
+      enabled: token.length > 0,
+      timeoutMs: this.get('FIGMA_TIMEOUT_MS'),
+    };
+  }
+
   get llm() {
     return {
       provider: this.get('LLM_PROVIDER'),

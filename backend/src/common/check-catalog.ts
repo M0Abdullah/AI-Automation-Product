@@ -21,7 +21,7 @@ export interface CheckDefinition {
   /** One line under the label, explaining what it actually verifies. */
   description: string;
   /** Grouping in the UI. */
-  group: 'Basics' | 'Forms' | 'Navigation' | 'Login';
+  group: 'Basics' | 'Forms' | 'Navigation' | 'Login' | 'Data & Loading' | 'Content';
   /** Ticked by default — the cheap, universally useful ones. */
   defaultOn: boolean;
   /** Hidden/disabled unless the run has test credentials. */
@@ -157,6 +157,34 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'urlContains with the login path so the user is still on the login page. Only assert ' +
       'specific error wording if the REQUIREMENTS state it.',
   },
+
+  // --------------------------------------------------- data & loading states
+  {
+    id: 'no_stuck_loader',
+    label: 'Loading finishes properly',
+    description: 'No spinner or skeleton is left on screen',
+    group: 'Data & Loading',
+    defaultOn: true,
+    instruction:
+      'Add one case that goes to the page and asserts noStuckLoader with no target. ' +
+      'This catches a spinner or skeleton that never resolves - the page technically ' +
+      'loaded, so no other assertion would notice. If the PAGE SCAN shows a distinct ' +
+      'content area, add a second case scoping noStuckLoader to that area by target.',
+  },
+  {
+    id: 'api_data_rendered',
+    label: 'Server data is displayed',
+    description: 'Values the API returns actually appear on the page',
+    group: 'Data & Loading',
+    defaultOn: false,
+    instruction:
+      'Add one or two cases asserting apiDataRendered. Set value to the JSON field name ' +
+      'you expect the page to display, chosen from the requirement or from field labels in ' +
+      'PAGE SCAN (for example "email", "name", "total"). Use a plain field name or a dotted ' +
+      'path. Optionally set target to the element that should show it. Do NOT guess field ' +
+      'names that have no basis in the scan or the requirement - a wrong field name produces ' +
+      'a useless failure. If you cannot identify a real field, skip this check entirely.',
+  }
 ];
 
 const BY_ID = new Map(CHECK_CATALOG.map((c) => [c.id, c]));

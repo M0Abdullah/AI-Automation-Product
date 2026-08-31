@@ -15,6 +15,16 @@ import {
 } from './schemas/test-plan.schema';
 import { TRIAGE_JSON_SCHEMA, TriageResponse, triageSchema } from './schemas/triage.schema';
 import {
+  CONTENT_CHECK_JSON_SCHEMA,
+  ContentCheckResponse,
+  contentCheckSchema,
+} from './schemas/content-check.schema';
+import {
+  CONTENT_CHECK_SYSTEM_PROMPT,
+  ContentCheckPromptInput,
+  buildContentCheckUserPrompt,
+} from './prompts/content-check.prompt';
+import {
   TEST_PLAN_SYSTEM_PROMPT,
   buildRepairPrompt,
   buildTestPlanUserPrompt,
@@ -147,6 +157,39 @@ export class LlmService {
     } catch (err) {
       this.logger.warn(`Triage call failed (finding will have no AI suggestion): ${String(err)}`);
       return null;
+    }
+  }
+
+  /**
+   * LLM call #3: read the page's own words and flag wording problems.
+   *
+   * Runs once per run against the scan, not once per test - the copy does not
+   * change between test cases, so paying for it repeatedly buys nothing.
+   *
+   * Returns [] rather than throwing on any failure. This pass is a nice-to-have;
+   * it must never be able to break a run.
+   */
+  async checkContent(input: ContentCheckPromptInput): Promise<ContentCheckResponse> {
+    const empty: ContentCheckResponse = { issues: [] };
+    try {
+      const res = await this.provider.completeJson({
+        systemPrompt: CONTENT_CHECK_SYSTEM_PROMPT,
+        userPrompt: buildContentCheckUserPrompt(input),
+        jsonSchema: CONTENT_CHECK_JSON_SCHEMA as never,
+        maxTokens: 2000,
+      });
+
+      const parsed = contentCheckSchema.safeParse(res.raw);
+      if (!parsed.success) {
+        this.logger.warn(
+          `Content check failed validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+        );
+        return empty;
+      }
+      return parsed.data;
+    } catch (err) {
+      this.logger.warn(`Content check failed (run continues without it): ${String(err)}`);
+      return empty;
     }
   }
 

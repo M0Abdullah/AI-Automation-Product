@@ -51,6 +51,28 @@ export class RunsService {
       );
     }
 
+    // A sign-in URL with nothing to sign in with would fail deep inside the
+    // pipeline. Rejecting it here turns a confusing mid-run failure into a
+    // clear message on the form.
+    if (dto.loginUrl && !dto.credentials?.email && !dto.credentials?.password) {
+      throw new BadRequestException(
+        'A sign-in URL was given but no test credentials. Add the test email and ' +
+          'password, or leave the sign-in URL empty to test the page as a visitor.',
+      );
+    }
+
+    // The sign-in must belong to the same site being tested. Otherwise this
+    // becomes a credential-submission tool pointed at arbitrary hosts.
+    if (dto.loginUrl) {
+      const loginHost = new URL(dto.loginUrl).origin;
+      if (loginHost !== parsed.origin) {
+        throw new BadRequestException(
+          `The sign-in URL must be on the same site as the page under test. ` +
+            `Target is ${parsed.origin}, sign-in is ${loginHost}.`,
+        );
+      }
+    }
+
     const project = await this.projects.findOrCreateForUrl(dto.url, dto.name);
 
     const run = await this.prisma.run.create({
@@ -62,6 +84,15 @@ export class RunsService {
         checks: packTags(checks.map((c) => c.id)),
         authorized: dto.authorized,
         allowDestructive: Boolean(dto.allowDestructive),
+        // Sign-in configuration. Trimmed to null rather than kept as '' so
+        // `if (run.loginUrl)` is a reliable "should we sign in" test.
+        loginUrl: dto.loginUrl?.trim() || null,
+        loginEmailField: dto.loginEmailField?.trim() || null,
+        loginPassField: dto.loginPassField?.trim() || null,
+        loginSubmit: dto.loginSubmit?.trim() || null,
+        // Accept a whole Figma URL as well as a bare key - people paste the URL.
+        figmaFileKey: parseFigmaFileKey(dto.figmaFileKey),
+        figmaNodeId: normaliseNodeId(dto.figmaNodeId),
         status: RunStatus.CREATED,
         statusMessage: 'Queued',
         // WHO started this run. Without it every run is anonymous and everyone
@@ -150,6 +181,12 @@ export class RunsService {
           },
         },
         rejections: { orderBy: { createdAt: 'asc' } },
+        // Advisory wording problems. Ordered so the confident ones lead, since
+        // this list is skimmed rather than read.
+        contentIssues: { orderBy: [{ confidence: 'desc' }, { createdAt: 'asc' }] },
+        // Closest misses first - a 1px difference is the surest sign of a real
+        // mistake, so it should be the first thing a reviewer reads.
+        designIssues: { orderBy: [{ offBy: 'asc' }, { createdAt: 'asc' }] },
         findings: {
           orderBy: { createdAt: 'desc' },
           include: {
@@ -273,4 +310,23 @@ function summarise(run: {
     ).length,
     confirmedFindings: run.findings.filter((f) => f.status === 'CONFIRMED').length,
   };
+}
+
+/**
+ * People paste the whole Figma URL, not the file key, so accept either.
+ * figma.com/design/ABC123/My-File?node-id=1-2  ->  ABC123
+ */
+function parseFigmaFileKey(input?: string): string | null {
+  const raw = input?.trim();
+  if (!raw) return null;
+  const m = raw.match(/figma\.com\/(?:file|design)\/([0-9a-zA-Z]{10,128})/);
+  return m ? m[1] : raw;
+}
+
+/** Figma writes node ids as "1-2" in URLs and "1:2" in the API. */
+function normaliseNodeId(input?: string): string | null {
+  const raw = input?.trim();
+  if (!raw) return null;
+  const fromUrl = raw.match(/node-id=([0-9]+[-:][0-9]+)/);
+  return (fromUrl ? fromUrl[1] : raw).replace('-', ':');
 }

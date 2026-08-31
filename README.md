@@ -94,7 +94,7 @@ The description is the generated bug report. Nothing retyped.
 
 | | |
 |---|---|
-| ✅ **Tick-box checks** | 11 ready-made checks — no test writing required |
+| ✅ **Tick-box checks** | 13 ready-made checks — no test writing required |
 | ✅ **AI test generation** | Plain-English requirements → structured test cases |
 | ✅ **Real Chrome execution** | Not a headless simulation; falls back to Chromium |
 | ✅ **Human approval gate** | Nothing runs until a person approves it |
@@ -102,7 +102,10 @@ The description is the generated bug report. Nothing retyped.
 | ✅ **Screenshots + traces** | Full-page capture and frame-by-frame replay |
 | ✅ **Console + API errors** | `POST /api/login → 401` captured automatically |
 | ✅ **Reproducibility check** | Every failure re-runs once in a clean browser |
-| ✅ **AI failure triage** | Suggests product bug vs test defect vs environment |
+| ✅ **Signs in first** | One sign-in, reused by every test — pages behind a login are testable |
+| ✅ **Wording review** | Typos, grammar and leftover placeholder text in the page copy |
+| ✅ **Design vs Figma** | Button heights, radii, type scale and fonts checked against a Figma frame |
+| ✅ **AI failure triage** | Whose fault (bug / test / environment) **and** what kind (UI / data / content / technical) |
 | ✅ **Bug reports** | `BUG-001` as PDF, Markdown or HTML |
 | ✅ **Ticket workflow** | Assignee, lifecycle, comments, retest, Jira link |
 | ✅ **Accounts + roles** | OWNER / QA / DEV / VIEWER, enforced by the API |
@@ -127,6 +130,51 @@ The description is the generated bug report. Nothing retyped.
 | | Buttons don't break the page | No crash on click |
 | **Login** | Login works | The test account signs in |
 | | Wrong password is rejected | A bad password doesn't get in |
+| **Data & loading** | Loading finishes properly | No spinner or skeleton is left on screen |
+| | Server data is displayed | A value the API returned actually appears on the page |
+
+### 🔑 Testing pages behind a login
+
+Give a **sign-in URL** alongside the test credentials and the platform signs in **once**, before it reads the page, then reuses that session for every test.
+
+This is what makes an app's interior testable. Without it a protected URL simply redirects to `/login`, the scan describes the login page while believing it's the dashboard, and every generated test asserts against a page it never saw.
+
+```
+Target   https://app.example.com/employee/attendance
+Sign-in  https://app.example.com/login
+```
+
+The sign-in is **not** a test case: it's deterministic, it can't be approved away, and it never appears in the results as a pass or a fail. The captured session is encrypted at rest, re-established if it goes stale, and wiped when the run finishes.
+
+### ✍️ Wording review — typos, grammar, leftover placeholder text
+
+A second pass reads the page's own copy and flags misspellings, broken grammar, mismatched labels, inconsistent capitalisation and shipped `Lorem ipsum`.
+
+**Advisory only.** A spell-check over real product copy will always be tempted by brand names and jargon, and one wrong flag costs more trust than ten missed typos. So these appear in their own **Wording** tab, never as a failure. You click **Raise bug** to turn one into a real defect, or **Not an issue** to dismiss it — and the dismissal sticks, so your product names stop coming back.
+
+Measured against a page seeded with 4 real errors and 10 decoys (`OTTO SEO`, `Kubernetes`, `gRPC`, `OAuth2`, Spanish text): **4/4 found, 0/10 false positives.**
+
+### 🎨 Design comparison — does the page match Figma?
+
+Paste a **Figma frame URL** and the platform reads the design as a *specification* — the button heights, corner radii, type sizes and fonts it permits — then checks the live page for conformance.
+
+It deliberately does **not** try to pair each Figma layer with one page element. In a real design system the layer is called `Color=Brand, Size=base, State=Initial` while the live button says `Pricing & FAQ`; there is nothing to pair on, and an app page rarely mirrors a design frame anyway.
+
+```
+Design read: heights 32/36/40/44/48/52px, radii 12px, type 12/14/16px
+300 values matched · 7 deviations across 138 elements
+
+  button height   "Pricing & FAQ"   page 38px  →  design 36px
+  corner radius   "Log in"          page 10px  →  design 16px
+  font size       "Log in"          page 15px  →  design 14px
+```
+
+**Near-misses only.** Something 2px off a design value is almost certainly meant to be that value; something 20px off is a component the design doesn't cover, and stays silent. Flagging everything would produce a wall nobody reads.
+
+Checks: button heights · corner radii · font sizes · font families.
+Not yet: element positions, spacing, colours, pixel diffing.
+
+Requires `FIGMA_TOKEN` in `backend/.env` with the **`file_content:read`** scope. Without it, every other check keeps working.
 
 ### Your own requirements — for business rules
 
@@ -154,6 +202,10 @@ The AI is **forbidden** from asserting anything you didn't write. That's what st
 | Environment | `chrome 151.0.7922.138 · 1366x768` |
 | Reproducibility | first attempt vs the automatic clean rerun |
 | AI analysis | classification + confidence + the evidence it quoted |
+| **Whose fault** | `PRODUCT_BUG` · `TEST_DEFECT` · `ENVIRONMENT_ISSUE` · `TEST_DATA_ISSUE` · `FLAKY` |
+| **What kind** | `FUNCTIONAL` · `TECHNICAL` · `DATA` · `CONTENT` · `UI_VISUAL` · `LOADING` |
+
+Those last two are independent axes, and a triager needs both. A defect can be `PRODUCT_BUG` + `UI_VISUAL` (real, and a layout problem) or `PRODUCT_BUG` + `DATA` (real, and the values are wrong) — the pair is what routes it to the right person.
 
 ---
 
@@ -192,6 +244,15 @@ LLM_API_KEY=gsk_...
 # Any 32 random bytes:
 #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 JWT_SECRET=...
+```
+
+Optional, for the design comparison only — everything else works without it:
+
+```ini
+# Figma > Settings > Security > Generate new token
+# Tick ONLY the "file_content:read" scope. Never grant a :write scope:
+# this tool reads a design and must never be able to modify one.
+FIGMA_TOKEN=figd_...
 ```
 
 ### Verify before you build on it
@@ -238,6 +299,8 @@ The full annotated list lives in [`backend/.env.example`](backend/.env.example).
 | `RETRY_FAILED_ONCE` | `true` | The reproducibility rerun. Turning it off increases false bugs |
 | `DESTRUCTIVE_KEYWORDS` | delete, pay, send… | Blocked unless explicitly allowed on the run |
 | `PUBLIC_API_URL` | `http://localhost:4000` | Absolute base for screenshot links in exported reports |
+| `FIGMA_TOKEN` | — | Optional. Enables design comparison. Scope: `file_content:read` only |
+| `FIGMA_TIMEOUT_MS` | `20000` | A design-system file can be large; raise it if reads time out |
 
 </details>
 
@@ -381,6 +444,8 @@ GET  /api/runs/:id                   everything the run page needs, one call
 POST /api/runs/:id/execute           run the approved tests
 POST /api/test-cases/:id/approve     the human gate
 POST /api/findings/:id/triage        the human verdict → mints BUG-001
+POST /api/content-issues/:id/promote a typo → a real bug, after you say so
+POST /api/design-issues/:id/promote  a design mismatch → a real bug, after you say so
 GET  /api/findings/:id/report/pdf    BUG-001.pdf
 POST /api/findings/:id/tickets       create TICKET-001 from a confirmed bug
 POST /api/tickets/:id/retest         the Ready-for-Retest handoff
@@ -396,9 +461,9 @@ Being upfront is more useful than a long feature list:
 
 | Not built | Why it matters |
 |---|---|
-| **Session reuse** | Every test signs in from scratch, so testing deep inside an app is slow. **Biggest next unlock.** |
 | **Multiple URLs per run** | One page per run today. 5 pages = 5 runs. |
-| Visual / pixel comparison | It tests whether things **work**, not whether they **look right**. No Figma comparison. |
+| **Data correctness** | It verifies a value the API returned is *displayed*, not that the value is *right*. There is no oracle for that. |
+| Pixel / visual regression | Design comparison checks sizes, radii and type — not positions, spacing, colour, or a screenshot diff |
 | Firefox, Safari, mobile | Chrome only |
 | Live Jira API sync | You paste the issue key and URL; it doesn't create the issue for you |
 | File upload, iframes, popups | — |
@@ -407,11 +472,13 @@ Being upfront is more useful than a long feature list:
 
 ### Roadmap, in order
 
-1. **Session reuse** — log in once, reuse cookies for every later test
-2. **Multiple URLs per run** — paste 5 pages, get one suite
+1. **Multiple URLs per run** — paste 5 pages, get one suite
+2. **Design comparison: positions and colour** — extend it past sizes and type
 3. **Visual regression** — approve a screenshot baseline, flag pixel changes
 4. **Live Jira connector** — create the issue via API with an idempotency key
 5. **Scheduled runs + CI** — nightly, and on every deploy
+
+Shipped since the first cut: **session reuse**, **wording review**, **design-vs-Figma comparison**, **stuck-loader** and **server-data** checks, and the **what-kind** bug category.
 
 ---
 

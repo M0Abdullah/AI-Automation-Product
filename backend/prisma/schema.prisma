@@ -56,6 +56,23 @@ model Run {
   /// user ticked. Stored so a re-plan repeats the same intent.
   checks       String @default("")
 
+  /// Where to sign in, when the target page sits behind a login.
+  /// Null means "do not sign in" - the run tests the page as an anonymous visitor.
+  loginUrl        String?
+  /// Optional overrides for when auto-detection cannot find the fields.
+  loginEmailField String?
+  loginPassField  String?
+  loginSubmit     String?
+  /// Set once a session has been established, for the UI to show "signed in as".
+  sessionEvidence String?
+
+  /// Design comparison. Both must be set for the check to run.
+  /// From a URL like figma.com/design/<key>/Name?node-id=<node>
+  figmaFileKey String?
+  figmaNodeId  String?
+  /// One-line summary of what was read, e.g. "Buttons - 2196 layers, heights 32,36,40".
+  designSpecSummary String?
+
   /// RunStatus — see src/common/enums.ts
   status        String  @default("CREATED")
   statusMessage String?
@@ -87,6 +104,8 @@ model Run {
   testCases  TestCase[]
   results    TestResult[]
   findings   Finding[]
+  contentIssues ContentIssue[]
+  designIssues  DesignIssue[]
   rejections PolicyRejection[]
 
   @@index([projectId, createdAt])
@@ -103,6 +122,15 @@ model RunSecret {
   /// AES-256-GCM payloads, format: iv:authTag:cipherText (all hex)
   emailCipher    String?
   passwordCipher String?
+
+  /// The signed-in browser state (cookies + localStorage), encrypted.
+  ///
+  /// Encrypted because a live session cookie is as sensitive as the password
+  /// that produced it. Stored rather than held in memory because the scan
+  /// happens before approval and execution happens after - possibly hours
+  /// later - and both need the same session. Wiped when the run finishes.
+  sessionCipher    String?
+  sessionCreatedAt DateTime?
 
   createdAt DateTime @default(now())
 
@@ -231,13 +259,41 @@ model NetworkLog {
 
 /// A failure awaiting human judgement. NOT a bug until a human confirms it.
 model Finding {
-  id         String     @id @default(uuid())
-  result     TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
-  resultId   String     @unique
-  run        Run        @relation(fields: [runId], references: [id], onDelete: Cascade)
-  runId      String
-  testCase   TestCase   @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
-  testCaseId String
+  id String @id @default(uuid())
+
+  /// WHERE THIS FINDING CAME FROM.
+  ///
+  /// Findings used to be possible only from a failed test, which forced
+  /// resultId and testCaseId to exist. But a typo is not a test result, and
+  /// neither is a layout that disagrees with the Figma design - both are real
+  /// defects a human confirmed. Rather than fabricating a synthetic test case
+  /// to hang them on (which would corrupt every pass/fail count), the two test
+  /// relations are optional and this field says which kind of finding it is.
+  ///
+  /// FindingSource - TEST | CONTENT | DESIGN
+  source String @default("TEST")
+
+  /// Set for source=TEST only.
+  result   TestResult? @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultId String?     @unique
+  testCase   TestCase? @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCaseId String?
+
+  /// Always set: every finding belongs to a run.
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  /// Set for source=CONTENT: the wording suggestion a human promoted.
+  contentIssue   ContentIssue? @relation(fields: [contentIssueId], references: [id], onDelete: SetNull)
+  contentIssueId String?       @unique
+
+  /// Set for source=DESIGN: the design deviation a human promoted.
+  designIssue   DesignIssue? @relation(fields: [designIssueId], references: [id], onDelete: SetNull)
+  designIssueId String?      @unique
+
+  /// A one-line title, needed because a CONTENT or DESIGN finding has no
+  /// test case to borrow one from.
+  title String?
 
   /// FindingStatus — NEW | TRIAGED | CONFIRMED | REJECTED | REOPENED | CLOSED
   status   String  @default("NEW")
@@ -250,8 +306,11 @@ model Finding {
   signature String
 
   // --- AI advisory fields. Suggestions only, never a verdict. ---
-  /// Classification — see src/common/enums.ts
+  /// Classification - WHOSE fault. See src/common/enums.ts
   aiClassification String?
+  /// BugCategory - WHAT KIND of defect. Independent axis from aiClassification:
+  /// a defect can be PRODUCT_BUG + UI_VISUAL, or PRODUCT_BUG + DATA.
+  aiCategory       String?
   aiConfidence     Float?
   aiSummary        String?
   aiSuspectedCause String?
@@ -464,4 +523,78 @@ model Counter {
   value Int    @default(0)
 
   @@map("counters")
+}
+
+/// ADVISORY ONLY - wording problems found by reading the page text.
+///
+/// Deliberately NOT a Finding: a spell-check on real copy will flag brand names
+/// and jargon, and a noisy false bug destroys trust in every other result. These
+/// are suggestions a human can promote, never a FAIL and never an automatic bug.
+model ContentIssue {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  /// ContentIssueKind - TYPO | GRAMMAR | LABEL | CASING | PLACEHOLDER | INCONSISTENT
+  kind       String
+  /// The exact text as it appears on the page.
+  text       String
+  /// What it probably should say. Null when the model only flags a doubt.
+  suggestion String?
+  /// Why it looks wrong, in one line.
+  reason     String?
+  /// 0..1. Anything under the display threshold is stored but shown as low.
+  confidence Float   @default(0)
+  /// Where on the page it was seen (heading, button, label...).
+  whereSeen  String?
+
+  /// Human decision, so dismissals stick between runs.
+  /// ContentIssueStatus - NEW | ACCEPTED | DISMISSED
+  status     String   @default("NEW")
+  reviewedBy String?
+  reviewedAt DateTime?
+
+  /// Set once a human promotes this suggestion into a real defect.
+  finding Finding?
+
+  createdAt DateTime @default(now())
+
+  @@index([runId, status])
+  @@map("content_issues")
+}
+
+/// ADVISORY - a place the live page disagrees with the Figma design.
+///
+/// Same contract as ContentIssue and for the same reason: a design comparison
+/// can never be certain that a difference is a mistake rather than a component
+/// the design does not cover. So these are suggestions a human promotes, never
+/// automatic bugs.
+model DesignIssue {
+  id    String @id @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  /// What was measured: "button height", "corner radius", "font size", "font family".
+  property String
+  /// The element, in words a human can find on the page.
+  element  String
+  selector String
+  actual   String
+  expected String
+  /// Distance from the design value. Smaller = more likely a genuine mistake.
+  offBy    Int
+  note     String?
+
+  /// ContentIssueStatus - NEW | ACCEPTED | DISMISSED
+  status     String    @default("NEW")
+  reviewedBy String?
+  reviewedAt DateTime?
+
+  /// Set once a human promotes this into a real defect.
+  finding Finding?
+
+  createdAt DateTime @default(now())
+
+  @@index([runId, status])
+  @@map("design_issues")
 }
