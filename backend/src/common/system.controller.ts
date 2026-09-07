@@ -1,8 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
-import { Public } from '../auth/auth.guard';
+import { Controller, Get, Post } from '@nestjs/common';
+import { Public, RequireWrite } from '../auth/auth.guard';
 import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TrackerService } from '../trackers/tracker.service';
 import { CHECK_CATALOG } from './check-catalog';
 import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from './test-plan.types';
 
@@ -17,14 +19,19 @@ export class SystemController {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly llm: LlmService,
+    private readonly trackers: TrackerService,
+    private readonly mail: MailService,
   ) {}
 
   // Public: the login screen shows a connection indicator before sign-in.
   @Public()
   @Get('health')
   async health() {
+    // `ping` rather than a query: it is the cheapest command MongoDB answers,
+    // it needs no collection to exist, and unlike a find() it cannot report
+    // healthy from a cached connection that the server has since dropped.
     const db = await this.prisma
-      .$queryRaw`SELECT 1`
+      .$runCommandRaw({ ping: 1 })
       .then(() => ({ ok: true }))
       .catch((e) => ({ ok: false, error: String(e).slice(0, 200) }));
 
@@ -46,6 +53,50 @@ export class SystemController {
       artifactsDir: this.config.artifactsDir,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * WHAT THIS INSTANCE IS CONNECTED TO.
+   *
+   * Deliberately reports only booleans and non-secret identifiers — a host, a
+   * project key, a From address. No token, no password, not even a masked one:
+   * a masked secret still leaks its length, and this endpoint is readable by
+   * every signed-in role including VIEWER.
+   */
+  @Get('integrations')
+  integrations() {
+    const mail = this.config.mail;
+    const tracker = this.trackers.status();
+
+    return {
+      tracker,
+      mail: {
+        enabled: mail.enabled,
+        host: mail.host || null,
+        port: mail.port,
+        from: mail.from || null,
+        // Which notifications would actually be sent, so "why did I not get an
+        // email" is answerable without reading the server's env.
+        events: {
+          onLogin: mail.onLogin,
+          onRunFinished: mail.onRunFinished,
+          onBugFiled: mail.onBugFiled,
+        },
+        appUrl: mail.appUrl,
+      },
+    };
+  }
+
+  /**
+   * POST /api/integrations/mail/verify — check the SMTP credentials.
+   *
+   * Verifies the connection rather than sending a message, so pressing it
+   * cannot put a test email in somebody's inbox.
+   */
+  @RequireWrite()
+  @Post('integrations/mail/verify')
+  verifyMail() {
+    return this.mail.verify();
   }
 
   /** What the model is allowed to ask for. Handy for the UI editor dropdowns. */

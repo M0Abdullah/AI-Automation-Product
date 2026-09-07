@@ -83,13 +83,24 @@ export class ContentIssuesController {
   ) {
     const issue = await this.prisma.contentIssue.findUnique({
       where: { id },
-      include: { finding: true },
+      // At most one, but a list in the schema - see schema.prisma.
+      include: { findings: { take: 1 } },
     });
     if (!issue) throw new NotFoundException(`Content issue ${id} not found`);
 
     // Idempotent: clicking twice must not mint a second BUG id for one typo.
-    if (issue.finding) {
-      return { findingId: issue.finding.id, bugKey: issue.finding.bugKey, alreadyExisted: true };
+    //
+    // This check is now the ONLY thing enforcing it. The database used to back
+    // it up with a unique index on Finding.contentIssueId, but that index
+    // rejected every finding that has no content issue - which is almost all of
+    // them - so it had to go.
+    const promotedAlready = issue.findings[0];
+    if (promotedAlready) {
+      return {
+        findingId: promotedAlready.id,
+        bugKey: promotedAlready.bugKey,
+        alreadyExisted: true,
+      };
     }
 
     if (issue.status === 'DISMISSED') {

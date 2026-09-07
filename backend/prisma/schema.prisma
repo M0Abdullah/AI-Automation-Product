@@ -1,25 +1,44 @@
 // ===========================================================================
-// DATA MODEL — SQLite (MVP)
+// DATA MODEL — MongoDB
 //
-// Lifecycle enforced by these tables:
-//   Project -> Run -> TestCase -> TestResult -> Finding -> FindingEvent
+// Lifecycle enforced by these collections:
+//   Project -> Run -> RunPage -> TestCase -> TestResult -> Finding -> FindingEvent
 //
-// WHY SQLITE: zero install, one file on disk, good enough to prove the MVP.
-// The PostgreSQL version of this exact model is kept at
-// docs/schema.postgres.prisma — switching back is: change the datasource,
-// swap this file for that one, re-run migrate. Nothing else changes, because
-// all the SQLite-specific handling is isolated in src/common/db-json.ts.
+// WHY MONGODB: the two things SQLite forced us to fake are native here.
+//   * Json / jsonb   -> `Json` columns. No packJson()/unpackJson().
+//   * String[]       -> real arrays. No comma-separated packing.
+// So src/common/db-json.ts and src/common/hydrate.ts are GONE — the API
+// payloads are produced directly by the driver instead of being reassembled.
 //
-// SQLITE LIMITATIONS AND HOW THEY ARE HANDLED
-//   * no enums        -> String columns, with the allowed values defined as
-//                        const objects in src/common/enums.ts
-//   * no String[]     -> comma-separated String, packed/unpacked by packTags()
-//   * no Json/jsonb   -> String holding JSON text, packed/unpacked by
-//                        packJson()/unpackJson()
-//   * no @db.Text     -> SQLite TEXT has no length limit anyway
+// IDS: `String @id @map("_id") @default(uuid())` rather than ObjectId.
+// Deliberate: it keeps every id a plain UUID string, so no field in the
+// codebase needs @db.ObjectId and no url, log line or bug report changes shape.
 //
-// Every API response is hydrated back into real objects and arrays in
-// src/common/hydrate.ts, so the frontend never sees a JSON string.
+// THE OPTIONAL-UNIQUE TRAP (read this before adding `@unique` to anything).
+//
+// Prisma creates MongoDB unique indexes NON-SPARSE, and MongoDB indexes a
+// MISSING field as null. So two documents that both omit an optional unique
+// field collide on it:
+//
+//   finding A: { ... }                 -> contentIssueId indexed as null
+//   finding B: { ... }                 -> DUPLICATE KEY, write rejected
+//
+// That is not a corner case: it made the second Finding ever created fail, which
+// meant the platform could hold exactly one finding for its whole lifetime.
+//
+// RULE: `@unique` only on a REQUIRED field. For an optional one, use a plain
+// @@index and enforce uniqueness in application code. Prisma forces the FK side
+// of a 1:1 to be @unique, so the three optional relations on Finding are
+// declared one-to-many in the schema and kept one-to-one by the services -
+// which is where that rule actually lives anyway (see createFinding and the
+// promote endpoints).
+//
+// ENUMS: still `String` columns with the allowed values in src/common/enums.ts.
+// Mongo supports Prisma enums, but a status is written from ~40 places and a
+// String column keeps `statusMessage`-style free text and the enum on the same
+// footing. The const objects in enums.ts are the single source of truth.
+//
+// SCHEMA CHANGES: Mongo has no migrations. Use `npx prisma db push`.
 // ===========================================================================
 
 generator client {
@@ -27,14 +46,14 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 // -------------------------------------------------------------- entities ----
 
 model Project {
-  id        String   @id @default(uuid())
+  id        String   @id @map("_id") @default(uuid())
   name      String
   baseUrl   String
   createdAt DateTime @default(now())
@@ -45,19 +64,44 @@ model Project {
 }
 
 model Run {
-  id        String  @id @default(uuid())
+  id        String  @id @map("_id") @default(uuid())
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId String
 
-  name         String
+  name String
+
+  /// THE ENTRY URL. Where the crawl starts, and the page a single-page run tests.
+  ///
+  /// Still called targetUrl because for a single-page run it is exactly that.
+  /// For a whole-app run it is the front door: every other page in the run is
+  /// discovered from here and recorded as a RunPage.
   targetUrl    String
   requirements String
-  /// Comma-separated check ids from src/common/check-catalog.ts — the boxes the
-  /// user ticked. Stored so a re-plan repeats the same intent.
-  checks       String @default("")
+  /// Check ids from src/common/check-catalog.ts — the boxes the user ticked.
+  /// Stored so a re-plan repeats the same intent.
+  checks       String[] @default([])
 
-  /// Where to sign in, when the target page sits behind a login.
-  /// Null means "do not sign in" - the run tests the page as an anonymous visitor.
+  // ------------------------------------------------------------- crawl scope
+  /// WHOLE-APP MODE. False = test targetUrl only (the original behaviour).
+  ///
+  /// True = discover the app's pages by following same-origin links from
+  /// targetUrl, then scan, plan and execute against every one of them. One run
+  /// covers the product instead of one screen.
+  crawlEnabled Boolean @default(false)
+  /// Hard ceiling on pages per run. The real constraint is LLM calls: planning
+  /// costs one call per page, so 20 pages is 20 calls plus 20 scans.
+  maxPages     Int     @default(10)
+  /// Link depth from the entry URL. 1 = only pages linked directly from it.
+  maxDepth     Int     @default(2)
+  /// Path substrings that a discovered URL must contain to be crawled.
+  /// Empty = no restriction.
+  includePaths String[] @default([])
+  /// Path substrings that exclude a discovered URL. Applied after includePaths,
+  /// on top of the always-excluded set in site-crawler.service.ts.
+  excludePaths String[] @default([])
+
+  /// Where to sign in, when the app sits behind a login.
+  /// Null means "do not sign in" - the run tests the app as an anonymous visitor.
   loginUrl        String?
   /// Optional overrides for when auto-detection cannot find the fields.
   loginEmailField String?
@@ -66,10 +110,17 @@ model Run {
   /// Set once a session has been established, for the UI to show "signed in as".
   sessionEvidence String?
 
-  /// Design comparison. Both must be set for the check to run.
+  // ------------------------------------------------------ design comparison
+  /// Both must be set for the check to run.
   /// From a URL like figma.com/design/<key>/Name?node-id=<node>
   figmaFileKey String?
   figmaNodeId  String?
+  /// WHICH PAGE THE DESIGN IS COMPARED AGAINST.
+  ///
+  /// The design check is single-page ON PURPOSE, even when the run crawls the
+  /// whole app: a Figma frame is one screen's design. Comparing a settings page
+  /// against a login frame produces noise, not findings. Null = the entry URL.
+  designPageUrl String?
   /// One-line summary of what was read, e.g. "Buttons - 2196 layers, heights 32,36,40".
   designSpecSummary String?
 
@@ -81,41 +132,96 @@ model Run {
   authorized       Boolean @default(false)
   allowDestructive Boolean @default(false)
 
-  /// JSON string: the PageSnapshot handed to the LLM. Kept so QA can see
-  /// exactly what the AI was shown.
-  pageSnapshot String?
+  /// The PageSnapshot for the ENTRY page, kept so a single-page run reads
+  /// exactly as it always did. Whole-app runs additionally store one snapshot
+  /// per RunPage.
+  pageSnapshot Json?
 
-  // Observability for the LLM call.
+  // Observability for the LLM calls. Totalled across every page planned.
   llmModel     String?
   llmTokensIn  Int?
   llmTokensOut Int?
   llmLatencyMs Int?
 
-  createdAt     DateTime  @default(now())
-  scanStartedAt DateTime?
-  planStartedAt DateTime?
-  execStartedAt DateTime?
-  finishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  crawlStartedAt DateTime?
+  scanStartedAt  DateTime?
+  planStartedAt  DateTime?
+  execStartedAt  DateTime?
+  finishedAt     DateTime?
 
   createdBy   User?   @relation("runCreator", fields: [createdById], references: [id])
   createdById String?
 
-  secret     RunSecret?
-  testCases  TestCase[]
-  results    TestResult[]
-  findings   Finding[]
+  secret        RunSecret?
+  pages         RunPage[]
+  testCases     TestCase[]
+  results       TestResult[]
+  findings      Finding[]
   contentIssues ContentIssue[]
   designIssues  DesignIssue[]
-  rejections PolicyRejection[]
+  rejections    PolicyRejection[]
 
   @@index([projectId, createdAt])
   @@map("runs")
 }
 
+/// ONE PAGE OF THE APP UNDER TEST.
+///
+/// This is what makes a run cover a product rather than a screen. The crawler
+/// creates one row per discovered page; the scan, the plan and the wording pass
+/// then run per row, and every TestCase points back at the page it was written
+/// for so the executor knows where to start.
+///
+/// A single-page run has exactly one of these (isEntry = true), which is why
+/// nothing downstream needs a special case for it.
+model RunPage {
+  id    String @id @map("_id") @default(uuid())
+  run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId String
+
+  /// The URL as discovered, normalised (no hash, no trailing slash).
+  url String
+  /// Just the path+query, for a compact UI label.
+  path String
+  /// The <title> once scanned. Null until then.
+  title String?
+  /// The entry URL the user submitted. Exactly one page per run has this set.
+  isEntry Boolean @default(false)
+  /// Which page linked to this one, and how far from the entry it sits.
+  /// Kept because "why is this page in my run" is a question QA will ask.
+  discoveredFrom String?
+  depth          Int     @default(0)
+  /// Crawl order, which is also the order the UI lists pages in.
+  order          Int     @default(0)
+
+  /// RunPageStatus — DISCOVERED | SCANNING | SCANNED | PLANNED | SCAN_FAILED |
+  /// PLAN_FAILED | SKIPPED  (see src/common/enums.ts)
+  status        String  @default("DISCOVERED")
+  statusMessage String?
+
+  /// The PageSnapshot handed to the LLM for THIS page.
+  pageSnapshot Json?
+  /// Element count, denormalised so the page list renders without loading
+  /// every snapshot.
+  elementCount Int @default(0)
+
+  scannedAt DateTime?
+  plannedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  testCases     TestCase[]
+  contentIssues ContentIssue[]
+  designIssues  DesignIssue[]
+
+  @@index([runId, order])
+  @@map("run_pages")
+}
+
 /// Encrypted test credentials. The plaintext never reaches the LLM — the model
 /// only ever sees a reference name such as "test_email".
 model RunSecret {
-  id    String @id @default(uuid())
+  id    String @id @map("_id") @default(uuid())
   run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId String @unique
 
@@ -138,24 +244,34 @@ model RunSecret {
 }
 
 model TestCase {
-  id    String @id @default(uuid())
+  id    String @id @map("_id") @default(uuid())
   run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId String
 
+  /// WHICH PAGE THIS CASE TESTS.
+  ///
+  /// Optional only so cases written before whole-app mode still load. New cases
+  /// always have it, and pageUrl below is what the executor actually starts at.
+  page   RunPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId String?
+  /// Denormalised start URL. Kept on the case rather than read through the
+  /// relation because the executor needs it for every attempt, and because a
+  /// manually edited case may point somewhere the crawler never visited.
+  pageUrl String?
+
   title       String
-  priority    String  @default("P2") // P0..P3
+  priority    String   @default("P2") // P0..P3
   /// CaseSource — LLM | MANUAL
-  source      String  @default("LLM")
-  order       Int     @default(0)
-  /// Comma-separated tags. packTags()/unpackTags() in src/common/db-json.ts
-  tags        String  @default("")
+  source      String   @default("LLM")
+  order       Int      @default(0)
+  tags        String[] @default([])
   rationale   String? // why the AI proposed this case
   requirement String? // which requirement line it traces to
 
-  /// JSON string: [{ action, target, valueRef?, value?, description }]
-  steps      String
-  /// JSON string: [{ type, target?, value?, description }]
-  assertions String
+  /// [{ action, target, valueRef?, value?, description }]
+  steps      Json
+  /// [{ type, target?, value?, description }]
+  assertions Json
 
   approved        Boolean   @default(false)
   approvedAt      DateTime?
@@ -170,11 +286,12 @@ model TestCase {
   findings Finding[]
 
   @@index([runId, order])
+  @@index([pageId, order])
   @@map("test_cases")
 }
 
 model TestResult {
-  id         String   @id @default(uuid())
+  id         String   @id @map("_id") @default(uuid())
   run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId      String
   testCase   TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
@@ -204,16 +321,19 @@ model TestResult {
   viewport       String?
   finalUrl       String?
 
-  /// JSON string:
   /// [{ index, action, target, status, locatorStrategy, durationMs, message }]
-  stepResults String
+  stepResults Json
 
   screenshotPath String?
   tracePath      String?
 
   consoleLogs ConsoleLog[]
   networkLogs NetworkLog[]
-  finding     Finding?
+  /// AT MOST ONE, despite the list type. See the optional-unique note at the
+  /// top of this file: a unique FK on Finding.resultId would reject every
+  /// finding that has no result. createFinding is the only writer and it checks
+  /// for an existing one first.
+  findings    Finding[]
 
   @@index([runId])
   @@index([testCaseId, attempt])
@@ -222,7 +342,7 @@ model TestResult {
 
 /// Every browser console message captured during the run.
 model ConsoleLog {
-  id       String     @id @default(uuid())
+  id       String     @id @map("_id") @default(uuid())
   result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
   resultId String
 
@@ -239,7 +359,7 @@ model ConsoleLog {
 /// Every request the page made. isApiError marks 4xx/5xx on xhr/fetch calls —
 /// that is the "API error" list QA wants to see.
 model NetworkLog {
-  id       String     @id @default(uuid())
+  id       String     @id @map("_id") @default(uuid())
   result   TestResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
   resultId String
 
@@ -259,7 +379,7 @@ model NetworkLog {
 
 /// A failure awaiting human judgement. NOT a bug until a human confirms it.
 model Finding {
-  id String @id @default(uuid())
+  id String @id @map("_id") @default(uuid())
 
   /// WHERE THIS FINDING CAME FROM.
   ///
@@ -274,8 +394,12 @@ model Finding {
   source String @default("TEST")
 
   /// Set for source=TEST only.
+  ///
+  /// NOT @unique - it is optional, and a unique index over the CONTENT and
+  /// DESIGN findings that legitimately have no result would reject all but the
+  /// first of them. "One finding per result" is enforced in createFinding.
   result   TestResult? @relation(fields: [resultId], references: [id], onDelete: Cascade)
-  resultId String?     @unique
+  resultId String?
   testCase   TestCase? @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
   testCaseId String?
 
@@ -284,12 +408,14 @@ model Finding {
   runId String
 
   /// Set for source=CONTENT: the wording suggestion a human promoted.
+  /// Not @unique - see the note at the top. The promote endpoint refuses to
+  /// mint a second bug for an issue that already has one.
   contentIssue   ContentIssue? @relation(fields: [contentIssueId], references: [id], onDelete: SetNull)
-  contentIssueId String?       @unique
+  contentIssueId String?
 
   /// Set for source=DESIGN: the design deviation a human promoted.
   designIssue   DesignIssue? @relation(fields: [designIssueId], references: [id], onDelete: SetNull)
-  designIssueId String?      @unique
+  designIssueId String?
 
   /// A one-line title, needed because a CONTENT or DESIGN finding has no
   /// test case to borrow one from.
@@ -314,8 +440,8 @@ model Finding {
   aiConfidence     Float?
   aiSummary        String?
   aiSuspectedCause String?
-  /// JSON string: { consoleErrors, apiErrors, attempts, evidenceUsed, ... }
-  aiEvidence       String?
+  /// { consoleErrors, apiErrors, attempts, evidenceUsed, ... }
+  aiEvidence       Json?
 
   // --- Human decision ---
   humanClassification String?
@@ -325,8 +451,14 @@ model Finding {
 
   // --- bug report identity (assigned when QA confirms it as a defect) ---
   /// Human-readable id, e.g. BUG-001. Null until confirmed.
-  bugKey    String? @unique
-  bugNumber Int?    @unique
+  ///
+  /// Not @unique for the same reason: most findings never get one, and a
+  /// non-sparse unique index would let only ONE un-confirmed finding exist.
+  /// Uniqueness comes from the Counter collection instead, which allocates
+  /// these with an atomic findAndModify - a stronger guarantee than an index,
+  /// because it cannot hand out the same number twice in the first place.
+  bugKey    String?
+  bugNumber Int?
   /// Which part of the product this defect lives in.
   module    String?
   /// Build / version / commit under test.
@@ -344,12 +476,19 @@ model Finding {
 
   @@index([runId, status])
   @@index([signature])
+  // Plain indexes where the unique ones used to be: the lookups they served
+  // ("is there already a finding for this result / issue?") still happen on
+  // every promote and every failure, they just are not uniqueness constraints.
+  @@index([resultId])
+  @@index([contentIssueId])
+  @@index([designIssueId])
+  @@index([bugKey])
   @@map("findings")
 }
 
 /// Append-only audit trail: who moved the finding, when, and why.
 model FindingEvent {
-  id        String  @id @default(uuid())
+  id        String  @id @map("_id") @default(uuid())
   finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
   findingId String
 
@@ -365,15 +504,18 @@ model FindingEvent {
 
 /// Anything the policy engine refused to execute, kept for transparency.
 model PolicyRejection {
-  id    String @id @default(uuid())
+  id    String @id @map("_id") @default(uuid())
   run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId String
 
   stage   String // LLM_SCHEMA | ACTION_NOT_ALLOWED | DESTRUCTIVE | ...
   subject String
   reason  String
-  /// JSON string: the offending step or assertion
-  payload String?
+  /// Which page's plan this rejection came from, so a 12-page run can say
+  /// WHERE the rejected step was proposed. Null for run-level rejections.
+  pageUrl String?
+  /// The offending step or assertion.
+  payload Json?
 
   createdAt DateTime @default(now())
 
@@ -390,7 +532,7 @@ model PolicyRejection {
 // ===========================================================================
 
 model User {
-  id           String    @id @default(uuid())
+  id           String    @id @map("_id") @default(uuid())
   email        String    @unique
   passwordHash String
   name         String
@@ -413,7 +555,7 @@ model User {
 /// One row per login. Doubles as the refresh-token store and the login history
 /// ("save user record of login") - who signed in, from where, and when.
 model LoginSession {
-  id     String @id @default(uuid())
+  id     String @id @map("_id") @default(uuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
@@ -438,7 +580,7 @@ model LoginSession {
 // ===========================================================================
 
 model Ticket {
-  id     String @id @default(uuid())
+  id     String @id @map("_id") @default(uuid())
   /// Human-readable key, e.g. TICKET-001. What people say out loud.
   key    String @unique
   number Int    @unique
@@ -456,8 +598,7 @@ model Ticket {
   severity String?
   module   String?
   build    String?
-  /// Comma-separated labels.
-  labels   String    @default("")
+  labels   String[]  @default([])
   dueDate  DateTime?
 
   assignee   User?   @relation("ticketAssignee", fields: [assigneeId], references: [id])
@@ -471,7 +612,12 @@ model Ticket {
   externalProvider  String?
   externalSyncedAt  DateTime?
   /// Idempotency key so a double-click cannot create two Jira issues.
-  externalRequestId String?   @unique
+  ///
+  /// Not @unique, again because it is optional: every ticket that has not been
+  /// pushed leaves it unset, and a non-sparse unique index would allow only one
+  /// such ticket. pushToTracker claims it before calling out and re-reads the
+  /// row on entry, which is what actually prevents the double-create.
+  externalRequestId String?
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -482,11 +628,12 @@ model Ticket {
   events   TicketEvent[]
 
   @@index([status, priority])
+  @@index([externalRequestId])
   @@map("tickets")
 }
 
 model TicketComment {
-  id       String @id @default(uuid())
+  id       String @id @map("_id") @default(uuid())
   ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId String
 
@@ -501,7 +648,7 @@ model TicketComment {
 
 /// Append-only audit trail for a ticket: every field change, with who and when.
 model TicketEvent {
-  id       String @id @default(uuid())
+  id       String @id @map("_id") @default(uuid())
   ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId String
 
@@ -517,9 +664,9 @@ model TicketEvent {
 }
 
 /// Atomic sequence generator for human-readable keys (BUG-001, TICKET-001).
-/// SQLite has no sequences, and counting rows races under concurrency.
+/// Counting rows races under concurrency; findAndModify on one document does not.
 model Counter {
-  name  String @id
+  name  String @id @map("_id")
   value Int    @default(0)
 
   @@map("counters")
@@ -531,9 +678,15 @@ model Counter {
 /// and jargon, and a noisy false bug destroys trust in every other result. These
 /// are suggestions a human can promote, never a FAIL and never an automatic bug.
 model ContentIssue {
-  id    String @id @default(uuid())
+  id    String @id @map("_id") @default(uuid())
   run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId String
+
+  /// Which page the wording was read from. A 12-page run needs this to be
+  /// actionable: "Contnue" is useless without knowing which screen it is on.
+  page   RunPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId String?
+  pageUrl String?
 
   /// ContentIssueKind - TYPO | GRAMMAR | LABEL | CASING | PLACEHOLDER | INCONSISTENT
   kind       String
@@ -555,7 +708,9 @@ model ContentIssue {
   reviewedAt DateTime?
 
   /// Set once a human promotes this suggestion into a real defect.
-  finding Finding?
+  /// At most one - the promote endpoint is idempotent. A list only because
+  /// Prisma would otherwise require a unique FK; see the note at the top.
+  findings Finding[]
 
   createdAt DateTime @default(now())
 
@@ -570,18 +725,36 @@ model ContentIssue {
 /// the design does not cover. So these are suggestions a human promotes, never
 /// automatic bugs.
 model DesignIssue {
-  id    String @id @default(uuid())
+  id    String @id @map("_id") @default(uuid())
   run   Run    @relation(fields: [runId], references: [id], onDelete: Cascade)
   runId String
 
-  /// What was measured: "button height", "corner radius", "font size", "font family".
+  /// The single page the design was compared against. Set even though the check
+  /// is single-page, so the UI can say WHICH page the Figma frame was matched to.
+  page   RunPage? @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId String?
+  pageUrl String?
+
+  /// WHAT WAS MEASURED.
+  ///
+  /// "button height" | "corner radius" | "font size" | "font family" |
+  /// "font weight" | "text colour" | "background colour" | "border colour" |
+  /// "element width" | "element height" | "spacing" | "icon size"
+  /// The catalogue lives in src/design/design-compare.ts.
   property String
+  /// Which family of properties this belongs to, so the UI can group and the
+  /// user can dismiss a whole class ("stop telling me about colours").
+  /// DesignIssueGroup - SIZE | TYPOGRAPHY | COLOUR | SPACING | ICON
+  group    String  @default("SIZE")
   /// The element, in words a human can find on the page.
   element  String
   selector String
   actual   String
   expected String
   /// Distance from the design value. Smaller = more likely a genuine mistake.
+  /// Pixels for geometry and type; weighted RGB distance for colour. Both land
+  /// in the same small range, so one "closest misses first" ordering works
+  /// across every property.
   offBy    Int
   note     String?
 
@@ -591,7 +764,8 @@ model DesignIssue {
   reviewedAt DateTime?
 
   /// Set once a human promotes this into a real defect.
-  finding Finding?
+  /// At most one, for the same reason as ContentIssue.findings.
+  findings Finding[]
 
   createdAt DateTime @default(now())
 

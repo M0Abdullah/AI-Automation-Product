@@ -1,68 +1,89 @@
 /* ==========================================================================
-   DESIGN SYSTEM
+   DESIGN SYSTEM — "INSTRUMENT"
    One place for tokens, one place for components. Light and dark are both
    defined, so the app follows the OS setting with no JavaScript.
+
+   THE IDEA: this is test equipment, not a marketing site. Bench instruments
+   share a look for good reasons, and they are the right reasons here too —
+   a neutral dark chassis so nothing competes with the reading, a faint
+   graticule grid for a sense of measurement, monospace for every value, and
+   status shown as literal signal lights.
+
+   Two rules hold the whole thing together:
+
+   1. TRUE-NEUTRAL GREYS. Not violet-tinted, not blue-tinted. A tinted
+      chassis fights the signal colours sitting on top of it; a neutral one
+      lets a green dot read as unambiguously green.
+
+   2. CHROME COLOUR AND VERDICT COLOUR ARE DIFFERENT LANGUAGES.
+      Signal lime is the instrument's own colour — the logo, focus rings, the
+      active nav rail, links, primary buttons. Pass/fail/flaky own the
+      content. Lime sits close to pass-green on the wheel, so they are kept
+      apart by FORM, not just hue: a button is a solid saturated fill with
+      near-black text; a verdict is a small squared chip with a tinted
+      background, a glowing dot and monospace caps. You cannot mistake one
+      for the other even at a glance, or in greyscale.
    ========================================================================== */
 
 :root {
-  /* Surfaces. Violet-tinted off-white rather than cold blue-grey: the neutrals
-     and the brand then belong to the same family, which is the difference
-     between "designed" and "default admin template". */
-  --bg: #f7f6fc;
-  --bg-tint: #efedf8;
+  /* LIGHT = "bench". Cool paper with the faintest green cast so the lime
+     accent belongs to the same family rather than sitting on top of it.
+     True neutral, though - no violet, no blue. */
+  --bg: #f4f5f3;
+  --bg-tint: #ebede9;
   --surface: #ffffff;
-  --surface-2: #f5f3fb;
-  --surface-3: #eae7f5;
-  --border: #e9e5f3;
-  --border-strong: #d7d1e7;
+  --surface-2: #f7f8f6;
+  --surface-3: #eef0ec;
+  --border: #e2e5e0;
+  --border-strong: #cbd0c7;
+  /* The graticule. Barely visible on purpose: it should register as texture,
+     not as graph paper. */
+  --grid: rgba(14, 17, 19, 0.045);
 
   /* Text - 3 weights only, to stop the page turning into grey soup */
-  --text: #16131f;
-  --text-dim: #5e5872;
-  --text-faint: #948ea8;
+  --text: #0e1113;
+  --text-dim: #52585c;
+  --text-faint: #858c90;
 
-  /* Electric violet. Not green, red, amber or blue - in a testing tool those
-     four are spoken for by pass / fail / warn / info, so the brand colour has
-     to sit outside the result palette or a button starts looking like a verdict. */
-  --brand: #6d4aff;
-  --brand-hover: #5c38f0;
-  --brand-soft: #f1edff;
-  --brand-border: #ded4ff;
+  /* SIGNAL LIME, darkened for light mode. #a3e635 on white is about 1.6:1 —
+     illegible — so light mode uses lime-700, which is the same colour identity
+     at a contrast that works. */
+  --brand: #4d7c0f;
+  --brand-hover: #3f6212;
+  --brand-soft: #f2f8e7;
+  --brand-border: #d5e8ae;
 
-  --pass: #04804d;
-  --pass-bg: #e6f8ef;
-  --pass-border: #a3e2c1;
-  --fail: #d1155a;
-  --fail-bg: #feeef3;
-  --fail-border: #f9c3d5;
-  --warn: #b45309;
-  --warn-bg: #fff5e6;
-  --warn-border: #f8dda6;
-  --info: #2563eb;
-  --info-bg: #eff4ff;
-  --info-border: #c3d6fd;
-  --neutral: #5f5977;
-  --neutral-bg: #f2f0f8;
-  --neutral-border: #e0dcec;
+  --pass: #067647;
+  --pass-bg: #e7f7ee;
+  --pass-border: #a5dfbf;
+  --fail: #c1121f;
+  --fail-bg: #fdecec;
+  --fail-border: #f5bfbf;
+  --warn: #96620a;
+  --warn-bg: #fdf4e3;
+  --warn-border: #f0d9a3;
+  --info: #0369a1;
+  --info-bg: #e9f4fb;
+  --info-border: #b3dbf0;
+  --neutral: #52585c;
+  --neutral-bg: #f2f3f1;
+  --neutral-border: #e0e3de;
 
-  /* Larger radii read as current; 8px corners are what dated the old build. */
-  --radius-lg: 18px;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --radius-xs: 7px;
+  /* TIGHT RADII. Instruments have machined edges, not pillowy ones. The soft
+     18px corners of the previous theme are the single biggest reason it read
+     as a generic SaaS dashboard rather than a tool. */
+  --radius-lg: 10px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-xs: 4px;
 
-  /* Layered shadows: a tight contact shadow plus a wide soft one. A single
-     flat shadow is what makes cards look pasted on. */
-  /* Shadows are violet-black, not pure black. A neutral shadow over a tinted
-     ground reads as dirt; a shadow sharing the ground's hue reads as depth. */
-  --shadow-sm: 0 1px 2px rgba(32, 22, 68, 0.05), 0 1px 3px rgba(32, 22, 68, 0.04);
-  --shadow:
-    0 1px 2px rgba(32, 22, 68, 0.05), 0 4px 10px -2px rgba(32, 22, 68, 0.07),
-    0 12px 24px -8px rgba(32, 22, 68, 0.06);
-  --shadow-lg:
-    0 2px 4px rgba(32, 22, 68, 0.06), 0 12px 28px -6px rgba(32, 22, 68, 0.12),
-    0 32px 64px -16px rgba(32, 22, 68, 0.16);
-  --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+  /* CRISP, NOT BILLOWY. A hairline border plus a tight contact shadow is how
+     a panel sits on a chassis. Wide soft shadows imply floating paper, which
+     is the wrong metaphor and also what makes a dark UI look smudged. */
+  --shadow-sm: 0 1px 1px rgba(14, 17, 19, 0.04);
+  --shadow: 0 1px 1px rgba(14, 17, 19, 0.04), 0 2px 6px -2px rgba(14, 17, 19, 0.06);
+  --shadow-lg: 0 1px 2px rgba(14, 17, 19, 0.06), 0 16px 32px -12px rgba(14, 17, 19, 0.18);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
 
   /* Inter and JetBrains Mono are loaded by next/font in app/layout.tsx. */
   --mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -82,86 +103,103 @@
    prefers-color-scheme media query further down. */
 :root[data-theme='dark'],
 :root[data-theme='system'] {
-    --bg: #0a0910;
-    --bg-tint: #100e1a;
-    --surface: #151222;
-    --surface-2: #1c182b;
-    --surface-3: #262137;
-    --border: #262135;
-    --border-strong: #38314e;
+    /* THE CHASSIS. True-neutral near-black, four steps of grey and nothing
+       else. Every previous surface carried a violet tint, which is exactly
+       what made a green PASS dot look slightly teal and an amber FLAKY look
+       slightly pink. A neutral ground is not a stylistic preference here —
+       it is what lets the signal colours be read correctly. */
+    --bg: #08090a;
+    --bg-tint: #0c0e10;
+    --surface: #101214;
+    --surface-2: #16191c;
+    --surface-3: #1d2124;
+    --border: #1e2225;
+    --border-strong: #2e343a;
+    /* The graticule, brighter than in light mode: a dark ground swallows a
+       low-contrast line entirely. */
+    --grid: rgba(230, 233, 234, 0.032);
 
-    --text: #edebf6;
-    --text-dim: #a19cba;
-    --text-faint: #6f6a87;
+    --text: #e6e9ea;
+    --text-dim: #98a1a6;
+    /* #646d73 would have been prettier and lands at 3.9:1 on the panel —
+       under the 4.5:1 floor. Metadata still has to be readable. */
+    --text-faint: #707a80;
 
-    --brand: #8b6fff;
-    --brand-hover: #9e86ff;
-    --brand-soft: #1e1735;
-    --brand-border: #382c5e;
+    /* SIGNAL LIME. The instrument's own colour: logo, focus ring, active nav
+       rail, links, primary buttons. Never a verdict — see rule 2 up top. */
+    --brand: #a3e635;
+    --brand-hover: #bef264;
+    --brand-soft: #16200a;
+    --brand-border: #2c3f12;
 
-    --pass: #4ade9b;
-    --pass-bg: #0c2418;
-    --pass-border: #1b5236;
-    --fail: #ff7a9a;
-    --fail-bg: #2b1019;
-    --fail-border: #5e2035;
-    --warn: #fbbf4c;
-    --warn-bg: #2b1e0c;
-    --warn-border: #59411a;
-    --info: #6fa8ff;
-    --info-bg: #101e38;
-    --info-border: #234066;
-    --neutral: #a29eb8;
-    --neutral-bg: #1d1a2a;
-    --neutral-border: #2f2a3f;
+    /* The signal palette. Deliberately the saturated, unambiguous versions:
+       a verdict is the one thing on screen that must never be mistaken. */
+    --pass: #4ade80;
+    --pass-bg: #0b1f13;
+    --pass-border: #1c4a2c;
+    --fail: #ff5c5c;
+    --fail-bg: #240e0e;
+    --fail-border: #57201f;
+    --warn: #fbbf24;
+    --warn-bg: #241a06;
+    --warn-border: #543d0f;
+    --info: #38bdf8;
+    --info-bg: #06202b;
+    --info-border: #124657;
+    --neutral: #98a1a6;
+    --neutral-bg: #16191c;
+    --neutral-border: #262b2f;
 
-    --shadow-sm: 0 1px 2px rgba(4, 2, 12, 0.6);
-    --shadow: 0 1px 2px rgba(4, 2, 12, 0.5), 0 8px 20px -4px rgba(4, 2, 12, 0.6);
-    --shadow-lg: 0 2px 6px rgba(4, 2, 12, 0.6), 0 24px 56px -12px rgba(4, 2, 12, 0.78);
-    --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
+    /* Almost no shadow. Depth in a dark instrument comes from the hairline
+       border and the surface step, not from a glow — a soft dark shadow over
+       a dark ground just reads as a smudge. */
+    --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 24px -14px rgba(0, 0, 0, 0.9);
+    --shadow-lg: 0 1px 0 rgba(0, 0, 0, 0.5), 0 24px 48px -20px rgba(0, 0, 0, 0.95);
+    --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 26%, transparent);
 }
 
 /* "System" mode: only go dark when the OS is dark. Selecting Light or Dark
    explicitly bypasses this entirely. */
 @media (prefers-color-scheme: light) {
+  /* Identical to the bare :root light block above. Duplicated rather than
+     shared because :root[data-theme='system'] has to out-specify the dark
+     block, and a variable cannot be "un-set" in CSS. */
   :root[data-theme='system'] {
-    --bg: #f7f6fc;
-    --bg-tint: #efedf8;
+    --bg: #f4f5f3;
+    --bg-tint: #ebede9;
     --surface: #ffffff;
-    --surface-2: #f5f3fb;
-    --surface-3: #eae7f5;
-    --border: #e9e5f3;
-    --border-strong: #d7d1e7;
-    --text: #16131f;
-    --text-dim: #5e5872;
-    --text-faint: #948ea8;
-    --brand: #6d4aff;
-    --brand-hover: #5c38f0;
-    --brand-soft: #f1edff;
-    --brand-border: #ded4ff;
-    --pass: #04804d;
-    --pass-bg: #e6f8ef;
-    --pass-border: #a3e2c1;
-    --fail: #d1155a;
-    --fail-bg: #feeef3;
-    --fail-border: #f9c3d5;
-    --warn: #b45309;
-    --warn-bg: #fff5e6;
-    --warn-border: #f8dda6;
-    --info: #2563eb;
-    --info-bg: #eff4ff;
-    --info-border: #c3d6fd;
-    --neutral: #5f5977;
-    --neutral-bg: #f2f0f8;
-    --neutral-border: #e0dcec;
-    --shadow-sm: 0 1px 2px rgba(13, 17, 23, 0.04), 0 1px 3px rgba(13, 17, 23, 0.03);
-    --shadow:
-      0 1px 2px rgba(13, 17, 23, 0.04), 0 4px 10px -2px rgba(13, 17, 23, 0.06),
-      0 12px 24px -8px rgba(13, 17, 23, 0.05);
-    --shadow-lg:
-      0 2px 4px rgba(13, 17, 23, 0.05), 0 12px 28px -6px rgba(13, 17, 23, 0.1),
-      0 32px 64px -16px rgba(13, 17, 23, 0.14);
-    --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+    --surface-2: #f7f8f6;
+    --surface-3: #eef0ec;
+    --border: #e2e5e0;
+    --border-strong: #cbd0c7;
+    --grid: rgba(14, 17, 19, 0.045);
+    --text: #0e1113;
+    --text-dim: #52585c;
+    --text-faint: #858c90;
+    --brand: #4d7c0f;
+    --brand-hover: #3f6212;
+    --brand-soft: #f2f8e7;
+    --brand-border: #d5e8ae;
+    --pass: #067647;
+    --pass-bg: #e7f7ee;
+    --pass-border: #a5dfbf;
+    --fail: #c1121f;
+    --fail-bg: #fdecec;
+    --fail-border: #f5bfbf;
+    --warn: #96620a;
+    --warn-bg: #fdf4e3;
+    --warn-border: #f0d9a3;
+    --info: #0369a1;
+    --info-bg: #e9f4fb;
+    --info-border: #b3dbf0;
+    --neutral: #52585c;
+    --neutral-bg: #f2f3f1;
+    --neutral-border: #e0e3de;
+    --shadow-sm: 0 1px 1px rgba(14, 17, 19, 0.04);
+    --shadow: 0 1px 1px rgba(14, 17, 19, 0.04), 0 2px 6px -2px rgba(14, 17, 19, 0.06);
+    --shadow-lg: 0 1px 2px rgba(14, 17, 19, 0.06), 0 16px 32px -12px rgba(14, 17, 19, 0.18);
+    --ring: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent);
   }
 }
 
@@ -218,9 +256,22 @@ html,
 body {
   margin: 0;
   padding: 0;
-  /* A very soft tint in the corner stops the page reading as flat grey. */
+  /* THE GRATICULE — the signature of this theme.
+     A 32px measurement grid, plus a wide vignette so the centre of the screen
+     is calm and the grid only registers at the edges. Without the vignette it
+     reads as graph paper and competes with the content; with it, it reads as
+     the surface of an instrument. Fixed so it does not scroll and induce
+     shimmer on a long results page. */
   background:
-    radial-gradient(1200px 620px at 100% -10%, var(--bg-tint), transparent 65%), var(--bg);
+    radial-gradient(900px 520px at 50% -5%, var(--bg-tint), transparent 70%),
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:
+    100% 100%,
+    32px 32px,
+    32px 32px,
+    100% 100%;
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--sans);
@@ -333,16 +384,17 @@ pre {
 .brand-mark {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  background: linear-gradient(140deg, #6d6afc, #a855f7 55%, #ec4899);
-  color: #fff;
+  border-radius: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--brand);
   display: grid;
   place-items: center;
+  font-family: var(--mono);
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px -1px color-mix(in srgb, var(--brand) 45%, transparent);
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 .nav-label {
@@ -730,20 +782,31 @@ textarea::placeholder {
   box-shadow: none;
   transform: none;
 }
+/* THE ONE SATURATED FILL IN THE WHOLE UI.
+   A solid lime slab with near-black text. That single combination is reserved
+   for "the primary action" and used for nothing else - which is what makes it
+   impossible to confuse with a pass chip, despite lime and pass-green being
+   neighbours: a verdict is never a saturated fill, and a button never has a
+   lit dot. Near-black text rather than white because lime is a light colour;
+   white-on-lime is about 1.7:1 and unreadable. */
 .btn-primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: #fff;
-  box-shadow:
-    0 1px 2px rgba(13, 17, 23, 0.1),
-    0 4px 12px -2px color-mix(in srgb, var(--brand) 40%, transparent);
+  color: #0a0c08;
+  font-weight: 650;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--brand-hover);
   border-color: var(--brand-hover);
-  box-shadow:
-    0 1px 2px rgba(13, 17, 23, 0.12),
-    0 6px 18px -2px color-mix(in srgb, var(--brand) 50%, transparent);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25), 0 0 20px -4px color-mix(in srgb, var(--brand) 45%, transparent);
+}
+/* Light mode uses lime-700, which is dark - so the text has to flip. */
+:root:not([data-theme='dark']) .btn-primary {
+  color: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .btn-primary { color: #0a0c08; }
 }
 .btn-danger {
   color: var(--fail);
@@ -787,20 +850,55 @@ textarea::placeholder {
 
 /* ============================================================ badges ===== */
 
+/* ---------------------------------------------------------- SIGNAL LIGHTS
+   A verdict is the single most important thing on the screen, so it gets its
+   own visual language and shares it with nothing else:
+
+     squared corners (3px)  · a solid fill is a BUTTON, a chip is a READING
+     monospace caps         · it is a value, not prose
+     a lit dot             · the actual signal, with a faint bloom
+     tinted bg + coloured text, never a saturated fill
+
+   That is what keeps a lime primary button from ever being mistaken for a
+   pass, even though lime and pass-green are neighbours on the wheel. The
+   difference survives greyscale and colour-blindness because the dot and the
+   label carry it too. */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.03em;
+  gap: 6px;
+  padding: 3px 8px;
+  /* 3px, not 20px. A pill reads as a tag; a squared chip reads as a readout. */
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
   border: 1px solid transparent;
   line-height: 1.5;
 }
+
+/* The lit dot. `currentColor` means each variant only has to set its colour
+   once, and the bloom scales with it automatically. */
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  flex-shrink: 0;
+}
+
+/* Two exceptions with no dot: a count is not a signal, and neither is a
+   label like "entry" or "whole app". A dot on those would imply a status. */
+.badge-count::before,
+.badge-plain::before {
+  display: none;
+}
+
 .badge-pass {
   background: var(--pass-bg);
   color: var(--pass);
@@ -826,21 +924,36 @@ textarea::placeholder {
   color: var(--neutral);
   border-color: var(--neutral-border);
 }
+/* Neutral is "no reading yet", so its dot is unlit — hollow rather than
+   glowing. An unlit lamp and a lit one are different states on real hardware
+   and should be here too. */
+.badge-neutral::before {
+  background: transparent;
+  border: 1px solid currentColor;
+  box-shadow: none;
+}
 .badge-brand {
   background: var(--brand-soft);
   color: var(--brand);
   border-color: var(--brand-border);
 }
+.badge-brand::before {
+  display: none;
+}
 
+/* A pill is metadata — a viewport, a browser version, "entry". Monospace
+   because almost all of it is a value, and bordered rather than filled so it
+   never competes with a signal chip. */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
-  border-radius: var(--radius-xs);
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: transparent;
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 550;
   color: var(--text-dim);
   white-space: nowrap;
@@ -1473,66 +1586,124 @@ details.collapse > summary::marker {
 :root {
   --sidebar-w: 264px;
   --header-h: 68px;
-  --radius-lg: 22px;
-  --radius: 16px;
-  --surface-glass: color-mix(in srgb, var(--surface) 92%, transparent);
+  /* Deliberately NOT re-inflating the radii the way the old theme did here.
+     Machined edges are the point; see the tokens at the top of the file. */
+  --radius-lg: 10px;
+  --radius: 8px;
+  --surface-glass: color-mix(in srgb, var(--surface) 94%, transparent);
 }
 
+/* Re-declared so the graticule survives this block. The two coloured washes
+   that used to be here (violet + pink) are gone: a tinted ground is exactly
+   what stopped the signal colours reading true. What is left is the grid and
+   one very faint brand glow at the top, which gives the chassis a light
+   source without tinting the whole surface. */
 body {
   background:
-    radial-gradient(900px 540px at 74% -12%, color-mix(in srgb, var(--brand) 11%, transparent), transparent 72%),
-    radial-gradient(760px 520px at 100% 34%, color-mix(in srgb, #e879b8 7%, transparent), transparent 70%),
+    radial-gradient(900px 520px at 50% -8%, color-mix(in srgb, var(--brand) 5%, transparent), transparent 68%),
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px),
     var(--bg);
+  background-size:
+    100% 100%,
+    32px 32px,
+    32px 32px,
+    100% 100%;
+  background-attachment: fixed;
 }
 
 /* A permanently dark rail beside a light canvas is deliberate - it anchors the
-   page and keeps navigation out of the reading area. It is violet-black rather
-   than blue-black so it belongs to the same family as the brand. */
+   page and keeps navigation out of the reading area. Now flat and
+   true-neutral: an instrument's side panel, not a gradient. The gradient is
+   gone because a vertical fade on a 100vh rail is invisible at the top and
+   muddy at the bottom, which is all cost and no effect. */
 .sidebar {
-  background: linear-gradient(180deg, #16122a 0%, #100d1e 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0b0d0e;
+  border-right: 1px solid #1b1f21;
   padding: 20px 15px;
-  color: #fff;
+  color: #e6e9ea;
 }
-.brand { gap: 12px; padding: 4px 8px 26px; color: #fff; }
+.brand { gap: 12px; padding: 4px 8px 26px; color: #e6e9ea; }
+/* The mark is a lit indicator, not a logo blob: a dark bezel with a lime
+   lamp inside it. Same idea as the status dots, one size up - which is what
+   ties the identity to the thing the product actually does. */
 .brand-mark {
   position: relative;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #a78bff 6%, #7c5cff 48%, #e879b8);
-  box-shadow: 0 10px 26px rgba(124, 92, 255, 0.38), inset 0 1px rgba(255, 255, 255, 0.32);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #14181a;
+  border: 1px solid #262c2f;
+  box-shadow: inset 0 0 12px rgba(163, 230, 53, 0.09);
 }
-.brand-pulse { width: 15px; height: 15px; border: 3px solid #fff; border-radius: 50%; position: relative; }
+.brand-pulse {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #a3e635;
+  box-shadow: 0 0 9px #a3e635, 0 0 20px rgba(163, 230, 53, 0.4);
+  position: relative;
+  border: none;
+}
+/* A slow breathe, so the panel reads as powered rather than as a screenshot.
+   4s and a shallow range: anything faster is a notification, and this is not
+   telling you anything. */
 .brand-pulse::after {
   content: '';
   position: absolute;
-  width: 5px;
-  height: 5px;
-  right: -5px;
-  top: -5px;
-  background: #f0abfc;
-  border: 2px solid #7c5cff;
+  inset: -5px;
   border-radius: 50%;
+  border: 1px solid rgba(163, 230, 53, 0.34);
+  animation: signal-breathe 4s ease-in-out infinite;
 }
+@keyframes signal-breathe {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  50% { opacity: 0.28; transform: scale(1.22); }
+}
+/* Respect the OS setting - a permanent pulse is a real problem for some
+   people, and nothing here depends on the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .brand-pulse::after { animation: none; }
+}
+
 .brand-copy { display: flex; flex-direction: column; line-height: 1.15; }
-.brand-copy strong { font-size: 15.5px; letter-spacing: -0.02em; }
-.brand-copy small { margin-top: 4px; color: #8b83a8; font-size: 10.5px; font-weight: 500; letter-spacing: 0.02em; }
-.nav-label { color: #6b6488; padding-left: 11px; }
-.nav-item { color: #a49dbe; padding: 9px 11px; margin: 2px 0; }
-.nav-item:hover { color: #fff; background: rgba(255, 255, 255, 0.055); }
-.nav-item-active {
-  color: #fff;
-  background: linear-gradient(90deg, rgba(124, 92, 255, 0.30), rgba(124, 92, 255, 0.06));
-  box-shadow: inset 3px 0 #a78bff;
+.brand-copy strong { font-size: 15px; letter-spacing: -0.015em; }
+.brand-copy small {
+  margin-top: 4px;
+  color: #6d767b;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
-.nav-item-active .nav-icon { color: #c4b5fd; }
-.nav-count { background: rgba(255,255,255,.09); color: #cdc7e0; }
-.sidebar-footer { border-color: rgba(255, 255, 255, 0.08); }
-.user-chip { color: #fff; }
-.user-chip:hover { background: rgba(255,255,255,.055); }
-.user-role { color: #837c9e; }
-.avatar { background: linear-gradient(145deg, #322a4d, #221c36); color: #c4b5fd; border-color: #423860; }
+/* Section labels in the rail are monospace caps - a panel legend. */
+.nav-label {
+  color: #5c6569;
+  padding-left: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+}
+.nav-item { color: #9aa3a8; padding: 9px 11px; margin: 2px 0; border-radius: 6px; }
+.nav-item:hover { color: #e6e9ea; background: rgba(230, 233, 234, 0.05); }
+/* THE ACTIVE RAIL. A 2px lime bar on the leading edge, which is the one place
+   the accent is unambiguous - it is chrome, nowhere near a verdict. */
+.nav-item-active {
+  color: #e6e9ea;
+  background: rgba(163, 230, 53, 0.07);
+  box-shadow: inset 2px 0 #a3e635;
+}
+.nav-item-active .nav-icon { color: #a3e635; opacity: 1; }
+.nav-count {
+  background: rgba(230, 233, 234, 0.07);
+  color: #b7bfc3;
+  font-family: var(--mono);
+}
+.sidebar-footer { border-color: #1b1f21; }
+.user-chip { color: #e6e9ea; }
+.user-chip:hover { background: rgba(230, 233, 234, 0.05); }
+.user-role { color: #6d767b; font-family: var(--mono); font-size: 11px; }
+.avatar { background: #16191c; color: #a3e635; border-color: #262c2f; }
 .topbar { padding: 0 30px; background: color-mix(in srgb, var(--bg) 78%, transparent); }
 .topbar-title { font-size: 14px; }
 .topbar-identity { color: var(--text-faint); font-size: 12px; white-space: nowrap; }
@@ -1552,15 +1723,14 @@ body {
 }
 .card:hover { border-color: var(--border-strong); }
 .card-head h2 { font-size: 17px; }
-.stat { border: 1px solid transparent; border-radius: 12px; }
+.stat { border: 1px solid transparent; border-radius: 6px; }
 .stat:hover { border-color: var(--border); background: var(--surface); }
 .btn { min-height: 38px; }
-.btn-primary {
-  background: linear-gradient(135deg, #8b6fff, #6535f5);
-  border-color: transparent;
-  box-shadow: 0 8px 22px rgba(109, 74, 255, 0.30), inset 0 1px rgba(255, 255, 255, 0.26);
-}
-.btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #9c85ff, #7448ff); border-color: transparent; transform: translateY(-1px); }
+/* Deliberately NOT re-styled here. This block used to paint a violet
+   gradient, which silently overrode the token-based rule further up and made
+   every palette change a no-op. Layout only - the fill lives with the tokens. */
+.btn-primary { border-color: var(--brand); }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
 .btn-lg { min-height: 46px; padding-inline: 19px; }
 input[type='text'], input[type='url'], input[type='email'], input[type='password'], input[type='date'], select, textarea {
   min-height: 44px;
@@ -1609,26 +1779,31 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
 .composer-submit > .btn,
 .composer-submit > .faint { grid-column: 1 / -1; }
 .composer-submit > .btn { margin-top: 4px !important; }
+/* The dashboard's headline panel. Reads as a darker module recessed into the
+   chassis - it carries its own graticule at a tighter 20px pitch, which is the
+   one place the grid is meant to be noticed. */
 .suite-health-card {
-  color: #fff;
+  color: #e6e9ea;
   background:
-    radial-gradient(520px 240px at 100% 0%, rgba(167, 139, 250, .20), transparent 70%),
-    linear-gradient(135deg, #1c1733, #120f22);
-  border-color: rgba(255,255,255,.06);
-  box-shadow: 0 22px 50px rgba(19, 18, 40, .18);
+    linear-gradient(to right, rgba(230, 233, 234, 0.028) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(230, 233, 234, 0.028) 1px, transparent 1px),
+    #0d0f11;
+  background-size: 20px 20px, 20px 20px, 100% 100%;
+  border-color: #1f2427;
+  box-shadow: inset 0 1px 0 rgba(230, 233, 234, 0.04);
 }
 .suite-health-card .faint,
-.suite-health-card .stat-label { color: #a099bd; }
-.suite-health-card .stat { background: rgba(255,255,255,.055); }
-.suite-health-card .stat:hover { background: rgba(255,255,255,.085); border-color: rgba(255,255,255,.08); }
+.suite-health-card .stat-label { color: #8b9498; }
+.suite-health-card .stat { background: rgba(230, 233, 234, 0.04); border-color: transparent; }
+.suite-health-card .stat:hover { background: rgba(230, 233, 234, 0.07); border-color: #262c2f; }
 
 @media (max-width: 860px) {
-  .sidebar { background: linear-gradient(90deg, #16122a, #100d1e); padding: 12px; }
+  .sidebar { background: #0b0d0e; padding: 12px; }
   .brand { padding: 2px 8px; margin-right: auto; }
   .brand-copy small, .sidebar-footer, .topbar-identity, .topbar > .faint { display: none; }
   .nav-item { padding: 9px; }
   .nav-item span:not(.nav-icon):not(.nav-count) { display: none; }
-  .nav-item-active { box-shadow: inset 0 -2px #a78bff; }
+  .nav-item-active { box-shadow: inset 0 -2px #a3e635; }
   .topbar { padding: 0 16px; }
   .content { padding: 24px 16px 40px; }
   .test-composer { grid-template-columns: 1fr; }
@@ -1684,10 +1859,11 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
   width: 54px;
   height: 54px;
   margin-bottom: 16px;
-  border-radius: 16px;
-  color: #fff;
-  background: linear-gradient(145deg, #a78bff 6%, #7c5cff 52%, #e879b8);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--brand) 36%, transparent);
+  border-radius: 10px;
+  color: var(--brand);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--brand) 10%, transparent);
 }
 
 /* auto-fit so three steps become one column on a narrow window without a
@@ -1726,4 +1902,59 @@ input[type='text'], input[type='url'], input[type='email'], input[type='password
   font-size: 12.5px;
   max-width: 640px;
   margin: 2px auto 0;
+}
+
+/* --------------------------------------------------------- whole-app scope
+   The crawl settings that appear when "Test the whole app" is ticked.
+   Indented and rule-marked rather than boxed: they are a refinement of the URL
+   above them, not a separate step, and a second card would imply otherwise. */
+.crawl-scope {
+  margin-top: 12px;
+  margin-left: 26px;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+  display: grid;
+  gap: 12px;
+  /* Two across on a wide screen, stacked on a narrow one. The number inputs
+     are short, so one per row would leave the form full of empty space. */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* The path filter reads as a full-width note under the two numbers. */
+.crawl-scope > .field:last-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .crawl-scope {
+    margin-left: 0;
+    padding-left: 10px;
+  }
+}
+
+/* -------------------------------------------------------------- integrations
+   One row per connected service: description on the left, its Test button
+   pinned right. Wraps to a stack on narrow screens so the button never gets
+   squeezed to an unreadable width. */
+.integration-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.integration-row > button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .integration-row {
+    flex-direction: column;
+  }
+  .integration-row > button {
+    align-self: stretch;
+  }
 }

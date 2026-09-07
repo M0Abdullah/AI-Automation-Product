@@ -78,6 +78,36 @@ export class TicketsController {
 
   /** POST /api/tickets/:id/external — record the Jira/Linear/GitHub issue. */
   @RequireWrite()
+  /**
+   * POST /api/tickets/:id/push — file this ticket in Jira / ClickUp / Linear.
+   *
+   * Idempotent: a ticket already filed returns its existing issue instead of
+   * creating a second one. Also the retry path after a failed push.
+   */
+  @RequireWrite()
+  @Post('tickets/:id/push')
+  push(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.tickets.pushToTracker(id, user);
+  }
+
+  /** GET /api/trackers/status — which tracker is configured, if any. */
+  @Get('trackers/status')
+  trackerStatus() {
+    return this.tickets.trackerStatus();
+  }
+
+  /**
+   * POST /api/trackers/verify — check the credentials.
+   *
+   * Deliberately does NOT create a test issue: a "Test connection" button that
+   * filed junk into a real backlog would be worse than no button.
+   */
+  @RequireWrite()
+  @Post('trackers/verify')
+  verifyTracker() {
+    return this.tickets.verifyTracker();
+  }
+
   @Post('tickets/:id/external')
   linkExternal(
     @Param('id') id: string,

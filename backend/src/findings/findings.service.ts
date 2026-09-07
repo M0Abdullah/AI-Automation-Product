@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { Finding } from '@prisma/client';
 import { CounterName, FindingStatus } from '../common/enums';
 import { CounterService } from '../common/counter.service';
-import { hydrateFinding, hydrateResult } from '../common/hydrate';
 import { PrismaService } from '../prisma/prisma.service';
 import { FindingNoteDto, TriageFindingDto } from './dto/triage.dto';
 
@@ -81,7 +80,7 @@ export class FindingsService {
       },
     });
 
-    return rows.map((r) => hydrateFinding(r as unknown as Record<string, unknown>));
+    return rows;
   }
 
   /** Full detail for the bug-report view, including all evidence. */
@@ -102,7 +101,7 @@ export class FindingsService {
       },
     });
     if (!finding) throw new NotFoundException(`Finding ${id} not found`);
-    return hydrateFinding(finding as unknown as Record<string, unknown>);
+    return finding;
   }
 
   /**

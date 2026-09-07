@@ -1,5 +1,4 @@
 import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
-import { hydrateResult } from '../common/hydrate';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -21,13 +20,25 @@ export class ResultsController {
         networkLogs: { orderBy: { at: 'asc' } },
         testCase: { select: { id: true, title: true, priority: true, requirement: true } },
         run: { select: { id: true, name: true, targetUrl: true } },
-        finding: { select: { id: true, status: true, aiClassification: true, aiSummary: true } },
+        // A list in the schema, at most one in practice. See the
+        // optional-unique note in schema.prisma - a unique FK on
+        // Finding.resultId would reject every finding that has no result.
+        findings: {
+          select: { id: true, status: true, aiClassification: true, aiSummary: true },
+          take: 1,
+        },
       },
     });
     if (!result) throw new NotFoundException(`Result ${id} not found`);
 
+    // The array is collapsed back to `finding` so the API shape is unchanged.
+    // The 1:N is a MongoDB indexing detail; it has no business meaning and no
+    // client should have to know about it.
+    const { findings, ...rest } = result;
+
     return {
-      ...hydrateResult(result as unknown as Record<string, unknown>),
+      ...rest,
+      finding: findings[0] ?? null,
       // Pre-split so the frontend does not need to filter.
       consoleErrors: result.consoleLogs.filter((c) => c.level === 'ERROR'),
       consoleWarnings: result.consoleLogs.filter((c) => c.level === 'WARNING'),

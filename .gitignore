@@ -21,7 +21,8 @@ npm-debug.log*
 Thumbs.db
 check-browser.png
 
-# SQLite database files (MVP local storage)
+# stray local database files. The platform runs on MongoDB now, but an old
+# SQLite dev.db may still be sitting in a working copy from before the move.
 *.db
 *.db-journal
 backend/prisma/*.db

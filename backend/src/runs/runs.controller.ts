@@ -27,6 +27,17 @@ export class RunsController {
     return this.runs.findOne(id);
   }
 
+  /**
+   * GET /api/runs/:id/pages/:pageId - one page's snapshot and advisory lists.
+   *
+   * Separate from findOne because a twelve-page run's snapshots are megabytes
+   * and findOne is polled while the run is in progress.
+   */
+  @Get(':id/pages/:pageId')
+  findPage(@Param('id') id: string, @Param('pageId') pageId: string) {
+    return this.runs.findPage(id, pageId);
+  }
+
   /** POST /api/runs/:id/execute - run every approved case. */
   @RequireWrite()
   @Post(':id/execute')

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BrowserFactory } from './browser.factory';
 import { PageScannerService } from './page-scanner.service';
+import { SiteCrawlerService } from './site-crawler.service';
 import { SessionService } from './session.service';
 import { TestExecutorService } from './test-executor.service';
 
@@ -10,9 +11,9 @@ import { TestExecutorService } from './test-executor.service';
  * container without changing the rest of the application.
  */
 @Module({
-  providers: [BrowserFactory, PageScannerService, TestExecutorService, SessionService],
+  providers: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
   // BrowserFactory is exported so ReportsModule can print PDFs with the same
   // Chromium instance instead of pulling in a separate PDF library.
-  exports: [BrowserFactory, PageScannerService, TestExecutorService, SessionService],
+  exports: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
 })
 export class BrowserModule {}

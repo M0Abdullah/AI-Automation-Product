@@ -25,9 +25,18 @@ const KIND_LABEL: Record<ContentIssueKind, string> = {
 
 export function ContentIssuesPanel({
   issues,
+  showPage,
   onPromoted,
 }: {
   issues: ContentIssue[];
+  /**
+   * Label each row with the page it came from.
+   *
+   * On a whole-app run this is not decoration: "Contnue" is unactionable until
+   * you know which of twelve screens it is on. Off for a single-page run, where
+   * repeating the same path on every row would be noise.
+   */
+  showPage?: boolean;
   /** Refresh the run so the new bug shows up under Failures. */
   onPromoted?: () => void;
 }) {
@@ -121,6 +130,13 @@ export function ContentIssuesPanel({
                   <div className="row" style={{ marginBottom: 4 }}>
                     <span className="badge badge-neutral">{KIND_LABEL[i.kind] ?? i.kind}</span>
                     {i.whereSeen && <span className="faint">in {i.whereSeen}</span>}
+                    {/* Which screen this is on. Without it a typo found on a
+                        twelve-page run cannot be acted on at all. */}
+                    {showPage && i.pageUrl && (
+                      <span className="pill mono" title={i.pageUrl}>
+                        {pathOf(i.pageUrl)}
+                      </span>
+                    )}
                     {i.confidence < 0.8 && (
                       <span className="faint" title="The AI was unsure - check it is not a name">
                         low confidence
@@ -189,4 +205,14 @@ export function ContentIssuesPanel({
       </div>
     </>
   );
+}
+
+/** "https://app.example.com/settings?tab=billing" -> "/settings?tab=billing" */
+function pathOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}` || '/';
+  } catch {
+    return url;
+  }
 }

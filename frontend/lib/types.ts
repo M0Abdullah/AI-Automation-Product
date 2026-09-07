@@ -77,6 +77,10 @@ export interface TestResultSummary {
 export interface TestCase {
   id: string;
   runId: string;
+  /** Which page of the app this case tests. Null on cases from single-page runs. */
+  pageId?: string | null;
+  /** The URL the case starts at. This is what makes a whole-app run work. */
+  pageUrl?: string | null;
   title: string;
   priority: string;
   source: 'LLM' | 'MANUAL';
@@ -151,6 +155,9 @@ export type ContentIssueKind =
 export interface ContentIssue {
   id: string;
   runId: string;
+  /** Which page the wording was read from. Essential on a whole-app run. */
+  pageId?: string | null;
+  pageUrl?: string | null;
   kind: ContentIssueKind;
   text: string;
   suggestion?: string | null;
@@ -163,11 +170,24 @@ export interface ContentIssue {
   createdAt: string;
 }
 
+/** Families of design property, so the UI can group and bulk-dismiss. */
+export type DesignIssueGroup = 'SIZE' | 'TYPOGRAPHY' | 'COLOUR' | 'SPACING' | 'ICON';
+
 /** One place the live page disagrees with the Figma design. Advisory. */
 export interface DesignIssue {
   id: string;
   runId: string;
+  /** The single page the design was compared against. */
+  pageId?: string | null;
+  pageUrl?: string | null;
+  /**
+   * 'button height' | 'control height' | 'corner radius' | 'icon size' |
+   * 'padding' | 'gap' | 'font size' | 'font family' | 'font weight' |
+   * 'text colour' | 'background colour' | 'border colour'
+   */
   property: string;
+  /** Which family `property` belongs to. Absent on pre-grouping runs. */
+  group?: DesignIssueGroup;
   element: string;
   selector: string;
   actual: string;
@@ -213,6 +233,8 @@ export interface Finding {
     consoleErrors?: string[];
     apiErrors?: string[];
     attempts?: number;
+    /** Which page broke - the first thing a triager needs on a whole-app run. */
+    pageUrl?: string;
     evidenceUsed?: string[];
     recommendedNextStep?: string;
   } | null;
@@ -243,9 +265,19 @@ export interface Finding {
 
 export interface PolicyRejection {
   id: string;
+  /**
+   * ACTION_NOT_ALLOWED | DESTRUCTIVE | NO_ASSERTIONS | LIMIT_EXCEEDED |
+   * NOT_TESTABLE | QUESTION_FOR_QA | CRAWL_SKIPPED | ...
+   *
+   * CRAWL_SKIPPED is not a rejection of a test step - it is a link the crawler
+   * deliberately did not follow. It shares this table because the question it
+   * answers is the same one: "what did you leave out, and why".
+   */
   stage: string;
   subject: string;
   reason: string;
+  /** Which page's plan this came from. Null for run-level entries. */
+  pageUrl?: string | null;
   createdAt: string;
 }
 
@@ -276,7 +308,63 @@ export interface PageSnapshot {
   truncated: boolean;
 }
 
+export type RunPageStatus =
+  | 'DISCOVERED'
+  | 'SCANNING'
+  | 'SCANNED'
+  | 'PLANNED'
+  | 'SCAN_FAILED'
+  | 'PLAN_FAILED'
+  | 'SKIPPED';
+
+/**
+ * ONE PAGE OF THE APP UNDER TEST.
+ *
+ * A single-page run has exactly one of these, so the UI has no special case:
+ * it renders the page list whenever there is more than one.
+ *
+ * `pageSnapshot` is deliberately absent here - twelve snapshots would be
+ * megabytes on a payload polled every couple of seconds. Fetch one page with
+ * api.getRunPage(runId, pageId) when its panel is opened.
+ */
+export interface RunPage {
+  id: string;
+  url: string;
+  /** path + query, e.g. "/settings/billing". */
+  path: string;
+  title?: string | null;
+  /** The URL the user submitted. Exactly one page per run has this. */
+  isEntry: boolean;
+  /** Which page linked to this one - answers "why is this in my run". */
+  discoveredFrom?: string | null;
+  depth: number;
+  order: number;
+  status: RunPageStatus;
+  statusMessage?: string | null;
+  elementCount: number;
+  scannedAt?: string | null;
+  plannedAt?: string | null;
+  _count?: { testCases: number; contentIssues: number; designIssues: number };
+}
+
+/** One page with everything about it. From GET /api/runs/:id/pages/:pageId. */
+export interface RunPageDetail extends RunPage {
+  pageSnapshot?: PageSnapshot | null;
+  contentIssues: ContentIssue[];
+  designIssues: DesignIssue[];
+  testCases: Array<{ id: string; title: string; priority: string }>;
+}
+
 export interface RunSummary {
+  /** Page totals. 1 on a single-page run. */
+  totalPages: number;
+  pagesPlanned: number;
+  /**
+   * Pages that could not be read or planned. The most important number on a
+   * whole-app run: a green suite over a third of the app is a lie.
+   */
+  pagesFailed: number;
+  pagesSkipped: number;
   totalCases: number;
   approvedCases: number;
   rejectedCases: number;
@@ -311,6 +399,8 @@ export interface RunDetail {
   loginUrl?: string | null;
   /** How the sign-in was confirmed, e.g. "navigated from /login to /secure". */
   sessionEvidence?: string | null;
+  /** Every page in the run, in crawl order. One entry for a single-page run. */
+  pages: RunPage[];
   testCases: TestCase[];
   rejections: PolicyRejection[];
   findings: Finding[];
@@ -320,8 +410,23 @@ export interface RunDetail {
   designIssues?: DesignIssue[];
   figmaFileKey?: string | null;
   figmaNodeId?: string | null;
+  /**
+   * The ONE page the Figma frame is compared against. Null = the entry URL.
+   * The design check stays single-page even when the run covers the whole app.
+   */
+  designPageUrl?: string | null;
   /** What was read from Figma and how the comparison went, in one line. */
   designSpecSummary?: string | null;
+
+  // --------------------------------------------------------- whole-app scope
+  /** True when this run crawled the app rather than testing one URL. */
+  crawlEnabled: boolean;
+  maxPages: number;
+  maxDepth: number;
+  includePaths: string[];
+  excludePaths: string[];
+  crawlStartedAt?: string | null;
+
   summary: RunSummary;
 }
 
@@ -334,7 +439,8 @@ export interface RunListItem {
   createdAt: string;
   finishedAt?: string | null;
   project: { id: string; name: string };
-  _count: { testCases: number; findings: number };
+  crawlEnabled?: boolean;
+  _count: { testCases: number; findings: number; pages: number };
 }
 
 export interface ResultDetail extends TestResultSummary {
@@ -412,7 +518,8 @@ export interface Ticket {
   severity?: string | null;
   module?: string | null;
   build?: string | null;
-  labels: string;
+  /** A real array now, not a comma-separated string. */
+  labels: string[];
   dueDate?: string | null;
   assignee?: { id: string; name: string; email: string } | null;
   reporter?: { id: string; name: string; email: string } | null;
@@ -444,6 +551,43 @@ export interface Ticket {
   };
   comments?: TicketComment[];
   events?: TicketEvent[];
+}
+
+/**
+ * WHICH ISSUE TRACKER THIS INSTANCE FILES INTO.
+ *
+ * `enabled` folds together "a provider is selected" and "it is fully
+ * configured", so no component has to re-derive whether a push can work.
+ */
+export interface TrackerStatus {
+  enabled: boolean;
+  provider: 'none' | 'jira' | 'clickup' | 'linear';
+  /** Human label, e.g. "Jira (acme.atlassian.net, project QA)". */
+  describe: string;
+  /** True when a confirmed defect is filed automatically, with no extra click. */
+  autoPush: boolean;
+  /** Env vars still missing. Empty when `enabled`. */
+  missingConfig: string[];
+}
+
+/**
+ * EVERYTHING THIS INSTANCE IS CONNECTED TO.
+ *
+ * Carries no secrets — a host and a project key, never a token. The endpoint
+ * behind it is readable by every role, VIEWER included.
+ */
+export interface IntegrationStatus {
+  tracker: TrackerStatus;
+  mail: {
+    enabled: boolean;
+    host: string | null;
+    port: number;
+    from: string | null;
+    /** Which notifications would actually be sent. */
+    events: { onLogin: boolean; onRunFinished: boolean; onBugFiled: boolean };
+    /** The base every link in an email is built from. */
+    appUrl: string;
+  };
 }
 
 /** Human labels for the ticket lifecycle. */

@@ -11,7 +11,9 @@ import {
   commentOnTicket,
   getTeam,
   getTicket,
+  getTrackerStatus,
   linkExternalTicket,
+  pushTicket,
   retestTicket,
   updateTicket,
 } from '../../../lib/api';
@@ -22,6 +24,7 @@ import {
   type TeamMember,
   type Ticket,
   type TicketStatus,
+  type TrackerStatus,
 } from '../../../lib/types';
 
 /**
@@ -43,6 +46,10 @@ export default function TicketPage() {
   const [comment, setComment] = useState('');
   const [retestMsg, setRetestMsg] = useState<string | null>(null);
   const [showLink, setShowLink] = useState(false);
+  // Which tracker this instance files into. Loaded once: it comes from the
+  // server's env and cannot change while the page is open.
+  const [tracker, setTracker] = useState<TrackerStatus | null>(null);
+  const [pushMsg, setPushMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [extKey, setExtKey] = useState('');
   const [extUrl, setExtUrl] = useState('');
 
@@ -60,6 +67,11 @@ export default function TicketPage() {
     getTeam()
       .then(setTeam)
       .catch(() => undefined);
+    // Comes from the server's environment, so it cannot change while the page
+    // is open — loaded once, never polled.
+    getTrackerStatus()
+      .then(setTracker)
+      .catch(() => setTracker(null));
   }, [load]);
 
   const act = async (label: string, fn: () => Promise<unknown>) => {
@@ -143,14 +155,49 @@ export default function TicketPage() {
             <button className="btn" onClick={onRetest} disabled={busy !== null}>
               {busy === 'retest' ? <span className="spinner" /> : '↻'} Retest
             </button>
+
             {ticket.externalUrl ? (
-              <a className="btn btn-primary" href={ticket.externalUrl} target="_blank" rel="noreferrer">
+              <a
+                className="btn btn-primary"
+                href={ticket.externalUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open {ticket.externalKey} ↗
               </a>
+            ) : canWrite && tracker?.enabled ? (
+              /*
+                ONE CLICK, REAL ISSUE.
+                Only offered when a tracker is actually configured — a button
+                that answers with "TRACKER_PROVIDER is not set" reads as a
+                broken feature rather than an unconfigured one. Idempotent
+                server-side, so a double-click cannot file two issues.
+              */
+              <button
+                className="btn btn-primary"
+                disabled={busy !== null}
+                onClick={() =>
+                  act('push', async () => {
+                    setPushMsg(null);
+                    const res = await pushTicket(ticket.id);
+                    setPushMsg({
+                      ok: res.ok,
+                      text: res.ok
+                        ? `Filed as ${res.key}.` +
+                          (res.warnings?.length ? ` ${res.warnings.join(' ')}` : '')
+                        : res.detail,
+                    });
+                  })
+                }
+                title={`Create the issue in ${tracker.describe}`}
+              >
+                {busy === 'push' ? <span className="spinner" /> : null} Push to{' '}
+                {providerLabel(tracker.provider)}
+              </button>
             ) : (
               canWrite && (
                 <button className="btn" onClick={() => setShowLink((v) => !v)}>
-                  Link to Jira
+                  Link an existing issue
                 </button>
               )
             )}
@@ -171,12 +218,46 @@ export default function TicketPage() {
           </div>
         )}
 
+        {/* A failed push must be visible and retryable. A confirmed bug that
+            quietly never reached the developers is the worst outcome here. */}
+        {pushMsg && (
+          <div
+            className={`banner ${pushMsg.ok ? 'banner-success' : 'banner-error'}`}
+            style={{ marginTop: 12, display: 'block' }}
+          >
+            {pushMsg.text}
+            {!pushMsg.ok && (
+              <div style={{ fontWeight: 400, marginTop: 4 }}>
+                The ticket is safe here. Fix the cause and press the button again.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* What WILL happen, stated before it does. */}
+        {!ticket.externalUrl && tracker?.enabled && (
+          <div className="faint" style={{ marginTop: 10 }}>
+            {tracker.autoPush
+              ? `New tickets are filed automatically in ${tracker.describe}.`
+              : `This instance is connected to ${tracker.describe}.`}{' '}
+            The bug report, the screenshot and the trace go with it.
+          </div>
+        )}
+        {!ticket.externalUrl && tracker && !tracker.enabled && canWrite && (
+          <div className="faint" style={{ marginTop: 10 }}>
+            No issue tracker is connected, so tickets stay in this tool.{' '}
+            {tracker.missingConfig.length > 0 &&
+              `Set ${tracker.missingConfig.join(', ')} in backend/.env to file into Jira, ClickUp or Linear automatically.`}
+          </div>
+        )}
+
         {/* ------------------------------------------------ link to tracker */}
         {showLink && !ticket.externalUrl && (
           <div className="card card-tight" style={{ marginTop: 12, background: 'var(--surface-2)' }}>
             <div className="field-hint">
-              Create the issue in Jira, then paste its key and URL here. The button above becomes a
-              link straight to it.
+              For an issue that already exists, or a tracker this tool cannot file into: paste its
+              key and URL here and the button above becomes a link straight to it. Connect Jira,
+              ClickUp or Linear in <code>backend/.env</code> to have this done for you.
             </div>
             <div className="grid-2">
               <label className="field" style={{ marginBottom: 0 }}>
@@ -323,8 +404,8 @@ export default function TicketPage() {
               <dd>{ticket.reporter?.name ?? '—'}</dd>
               <dt>Labels</dt>
               <dd>
-                {ticket.labels
-                  ? ticket.labels.split(',').map((l) => (
+                {ticket.labels?.length
+                  ? ticket.labels.map((l) => (
                       <span className="pill" key={l} style={{ marginRight: 4 }}>
                         {l.trim()}
                       </span>
@@ -413,4 +494,10 @@ export default function TicketPage() {
       </div>
     </div>
   );
+}
+
+/** "clickup" -> "ClickUp". The others just need a capital. */
+function providerLabel(provider: string): string {
+  if (provider === 'clickup') return 'ClickUp';
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
 }

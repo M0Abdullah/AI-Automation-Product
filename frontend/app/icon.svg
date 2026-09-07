@@ -1,23 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AI Testing Platform">
-  <!-- Matches the in-app brand mark, so the browser tab is recognisable next to
-       a dozen other localhost tabs. Next.js App Router serves app/icon.svg as
-       the favicon automatically - no <link> tag needed. -->
+  <!-- Matches the in-app brand mark: a dark instrument bezel with a lit lime
+       lamp. Recognisable at 16px next to a dozen other localhost tabs, which a
+       gradient blob with two letters in it is not.
+       Next.js App Router serves app/icon.svg as the favicon automatically. -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#6d6afc" />
-      <stop offset="55%" stop-color="#a855f7" />
-      <stop offset="100%" stop-color="#ec4899" />
-    </linearGradient>
+    <radialGradient id="lamp" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d9f99d" />
+      <stop offset="55%" stop-color="#a3e635" />
+      <stop offset="100%" stop-color="#65a30d" />
+    </radialGradient>
+    <filter id="bloom" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#g)" />
-  <text
-    x="32"
-    y="43"
-    text-anchor="middle"
-    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif"
-    font-size="30"
-    font-weight="800"
-    letter-spacing="-1.5"
-    fill="#ffffff"
-  >AI</text>
+
+  <!-- the chassis -->
+  <rect width="64" height="64" rx="14" fill="#101214" />
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#2a3033" stroke-width="1.5" />
+
+  <!-- the graticule, so the icon carries the same idea as the app -->
+  <g stroke="#a3e635" stroke-opacity="0.12" stroke-width="1">
+    <path d="M22 8V56M42 8V56M8 22H56M8 42H56" />
+  </g>
+
+  <!-- the signal -->
+  <circle cx="32" cy="32" r="9" fill="url(#lamp)" filter="url(#bloom)" />
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#a3e635" stroke-opacity="0.45" stroke-width="1.5" />
 </svg>

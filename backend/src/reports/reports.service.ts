@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { BrowserFactory } from '../browser/browser.factory';
-import { unpackJson } from '../common/db-json';
+import { readJson } from '../common/json';
 import type { StepResult } from '../common/test-plan.types';
 import { AppConfigService } from '../config/app-config.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -101,7 +101,7 @@ export class ReportsService {
     // clearly as a draft rather than inventing a permanent id.
     const bugKey = finding.bugKey ?? `DRAFT-${finding.id.slice(0, 8)}`;
 
-    const evidence = unpackJson<{ consoleErrors?: string[]; apiErrors?: string[] }>(
+    const evidence = readJson<{ consoleErrors?: string[]; apiErrors?: string[] }>(
       finding.aiEvidence,
       {},
     );
@@ -196,7 +196,7 @@ export class ReportsService {
             attempt: r?.attempt ?? null,
           },
 
-      steps: unpackJson<StepResult[]>(r?.stepResults ?? null, []),
+      steps: readJson<StepResult[]>(r?.stepResults ?? null, []),
       consoleErrors: consoleErrors.length ? consoleErrors : (evidence.consoleErrors ?? []),
       apiErrors: apiErrors.length ? apiErrors : (evidence.apiErrors ?? []),
       screenshotUrl,

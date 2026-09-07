@@ -113,7 +113,78 @@ export class AppConfigService {
       retryFailedOnce: this.get('RETRY_FAILED_ONCE'),
       destructiveKeywords: this.get('DESTRUCTIVE_KEYWORDS').map((k) => k.toLowerCase()),
       maxTestCasesPerRun: this.get('MAX_TEST_CASES_PER_RUN'),
+      maxTestCasesPerPage: this.get('MAX_TEST_CASES_PER_PAGE'),
       maxStepsPerCase: this.get('MAX_STEPS_PER_CASE'),
+    };
+  }
+
+  // --- issue tracker ---
+  /**
+   * Every provider's settings are read regardless of which one is selected, so
+   * switching TRACKER_PROVIDER needs no code change and a misconfigured
+   * provider can report exactly which variables it is missing.
+   */
+  get tracker() {
+    return {
+      provider: this.get('TRACKER_PROVIDER'),
+      autoPush: this.get('TRACKER_AUTO_PUSH'),
+      timeoutMs: this.get('TRACKER_TIMEOUT_MS'),
+      jira: {
+        baseUrl: this.get('JIRA_BASE_URL').trim().replace(/\/+$/, ''),
+        email: this.get('JIRA_EMAIL').trim(),
+        apiToken: this.get('JIRA_API_TOKEN').trim(),
+        projectKey: this.get('JIRA_PROJECT_KEY').trim().toUpperCase(),
+        issueType: this.get('JIRA_ISSUE_TYPE').trim() || 'Bug',
+      },
+      clickup: {
+        apiToken: this.get('CLICKUP_API_TOKEN').trim(),
+        listId: this.get('CLICKUP_LIST_ID').trim(),
+        status: this.get('CLICKUP_STATUS').trim(),
+      },
+      linear: {
+        apiKey: this.get('LINEAR_API_KEY').trim(),
+        team: this.get('LINEAR_TEAM').trim(),
+      },
+    };
+  }
+
+  // --- email ---
+  /**
+   * `enabled` is the only thing callers should test. It folds together the
+   * switch and the two settings without which sending is impossible, so no
+   * call site has to re-derive "is email actually usable".
+   */
+  get mail() {
+    const host = this.get('MAIL_HOST').trim();
+    const from = this.get('MAIL_FROM').trim();
+    return {
+      enabled: this.get('MAIL_ENABLED') && host.length > 0 && from.length > 0,
+      host,
+      port: this.get('MAIL_PORT'),
+      secure: this.get('MAIL_SECURE'),
+      user: this.get('MAIL_USER').trim(),
+      password: this.get('MAIL_PASSWORD'),
+      from,
+      timeoutMs: this.get('MAIL_TIMEOUT_MS'),
+      appUrl: this.get('APP_PUBLIC_URL'),
+      onLogin: this.get('MAIL_ON_LOGIN'),
+      onRunFinished: this.get('MAIL_ON_RUN_FINISHED'),
+      onBugFiled: this.get('MAIL_ON_BUG_FILED'),
+    };
+  }
+
+  // --- whole-app crawl ---
+  /**
+   * The hard ceilings are separate from the defaults on purpose: the defaults
+   * are a starting point the user may change per run, the hard values are what
+   * the API clamps to, so a crafted request cannot ask for a 10,000-page crawl.
+   */
+  get crawl() {
+    return {
+      defaultMaxPages: this.get('CRAWL_DEFAULT_MAX_PAGES'),
+      defaultMaxDepth: this.get('CRAWL_DEFAULT_MAX_DEPTH'),
+      maxPagesHard: this.get('CRAWL_MAX_PAGES_HARD'),
+      maxDepthHard: this.get('CRAWL_MAX_DEPTH_HARD'),
     };
   }
 }

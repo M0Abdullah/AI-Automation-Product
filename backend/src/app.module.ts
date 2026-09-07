@@ -11,6 +11,7 @@ import { SystemController } from './common/system.controller';
 import { AppConfigModule } from './config/config.module';
 import { FindingsModule } from './findings/findings.module';
 import { LlmModule } from './llm/llm.module';
+import { MailModule } from './mail/mail.module';
 import { PolicyModule } from './policy/policy.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -20,11 +21,12 @@ import { RunsModule } from './runs/runs.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { TestCasesModule } from './test-cases/test-cases.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { TrackersModule } from './trackers/trackers.module';
 
 /**
  * Module map, grouped by layer:
  *
- *  infrastructure : AppConfig, Prisma, Secrets, Auth        (global)
+ *  infrastructure : AppConfig, Prisma, Secrets, Auth, Mail, Trackers (global)
  *  capability     : Llm (brain), Browser (hands), Policy (gate)
  *  product        : Projects, Runs, TestCases, Results, Findings,
  *                   Tickets, Reports, Artifacts
@@ -39,6 +41,10 @@ import { TicketsModule } from './tickets/tickets.module';
     PrismaModule,
     SecretsModule,
     AuthModule,
+    // Both global: notifications and issue filing are cross-cutting, and
+    // threading them through every product module adds only ceremony.
+    MailModule,
+    TrackersModule,
     // capability
     LlmModule,
     BrowserModule,

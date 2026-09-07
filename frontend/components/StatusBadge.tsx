@@ -42,8 +42,24 @@ const FINDING_TONE: Record<FindingStatus, Tone> = {
   CLOSED: 'pass',
 };
 
-function Badge({ tone, children }: { tone: Tone; children: React.ReactNode }) {
-  return <span className={`badge badge-${tone}`}>{children}</span>;
+/**
+ * `plain` drops the lit dot.
+ *
+ * The dot means "this is a signal reading" — a verdict, a status. A priority or
+ * a count is neither: it is a property of the test, not a measurement of it.
+ * Putting a lamp on those spends the one visual device that makes a real
+ * verdict unmissable, which is the whole reason the theme has it.
+ */
+function Badge({
+  tone,
+  plain,
+  children,
+}: {
+  tone: Tone;
+  plain?: boolean;
+  children: React.ReactNode;
+}) {
+  return <span className={`badge badge-${tone}${plain ? ' badge-plain' : ''}`}>{children}</span>;
 }
 
 export function RunStatusBadge({ status }: { status: RunStatus }) {
@@ -64,11 +80,18 @@ export function FindingStatusBadge({ status }: { status: FindingStatus }) {
   return <Badge tone={FINDING_TONE[status]}>{status}</Badge>;
 }
 
-/** Priority chip - P0 is a release blocker, so it gets the loud colour. */
+/**
+ * Priority chip - P0 is a release blocker, so it gets the loud colour.
+ * No dot: how urgent a test is is not a reading it produced.
+ */
 export function PriorityBadge({ priority }: { priority: string }) {
   const tone: Tone =
     priority === 'P0' ? 'fail' : priority === 'P1' ? 'warn' : priority === 'P2' ? 'info' : 'neutral';
-  return <Badge tone={tone}>{priority}</Badge>;
+  return (
+    <Badge tone={tone} plain>
+      {priority}
+    </Badge>
+  );
 }
 
 const CLASSIFICATION_LABEL: Record<string, string> = {

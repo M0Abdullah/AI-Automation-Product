@@ -131,7 +131,7 @@ export function TestCaseCard({
           {latest && <ResultStatusBadge status={latest.status} />}
           {!latest && testCase.approved && <span className="badge badge-brand">approved</span>}
           {!latest && !testCase.approved && !testCase.rejected && (
-            <span className="badge badge-warn">needs review</span>
+            <span className="badge badge-warn badge-plain">needs review</span>
           )}
           {testCase.rejected && <span className="badge badge-neutral">skipped</span>}
           {testCase.destructive && <span className="badge badge-fail">risky</span>}

@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'node:crypto';
 import { UserRole } from '../common/enums';
 import { AppConfigService } from '../config/app-config.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { PasswordService } from './password.service';
@@ -46,6 +47,7 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto, meta: { userAgent?: string; ip?: string }): Promise<AuthResult> {
@@ -76,6 +78,7 @@ export class AuthService {
     });
 
     this.logger.log(`Registered ${user.email} as ${user.role}`);
+    this.notifySignIn(user, meta, true);
     return this.issueTokens(user, meta);
   }
 
@@ -96,11 +99,14 @@ export class AuthService {
       throw new ForbiddenException('This account has been deactivated.');
     }
 
+    const isFirstLogin = !user.lastLoginAt;
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
 
+    this.notifySignIn(user, meta, isFirstLogin);
     return this.issueTokens(user, meta);
   }
 
@@ -187,6 +193,34 @@ export class AuthService {
   }
 
   // ------------------------------------------------------------- internals
+
+  /**
+   * SIGN-IN ALERT — a security notice to the account owner.
+   *
+   * Deliberately NOT awaited. Signing in must succeed when the SMTP host is
+   * down or slow: making authentication depend on an outbound email would turn
+   * a mail outage into an outage of the whole product. MailService swallows its
+   * own failures, so the `void` here cannot produce an unhandled rejection.
+   *
+   * Not sent on `refresh()` either — a token rotation happens silently every
+   * hour and is not a sign-in event a person needs to hear about. Alerting on
+   * it would train people to ignore the alert that matters.
+   */
+  private notifySignIn(
+    user: { email: string; name: string },
+    meta: { userAgent?: string; ip?: string },
+    isFirstLogin: boolean,
+  ): void {
+    if (!this.config.mail.onLogin) return;
+    void this.mail.sendLoginAlert({
+      to: user.email,
+      name: user.name,
+      at: new Date(),
+      ipAddress: meta.ip,
+      userAgent: meta.userAgent,
+      isFirstLogin,
+    });
+  }
 
   private async issueTokens(
     user: { id: string; email: string; name: string; role: string },

@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CounterName, TICKET_TRANSITIONS, TicketStatus, type TicketStatus as TicketStatusT } from '../common/enums';
 import { CounterService } from '../common/counter.service';
+import { AppConfigService } from '../config/app-config.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from '../reports/reports.service';
+import { TrackerService, describeError } from '../trackers/tracker.service';
 import { RunPipelineService } from '../runs/run-pipeline.service';
 import type { JwtPayload } from '../auth/auth.service';
 import {
@@ -32,6 +35,9 @@ export class TicketsService {
     private readonly counters: CounterService,
     private readonly reports: ReportsService,
     private readonly pipeline: RunPipelineService,
+    private readonly trackers: TrackerService,
+    private readonly mail: MailService,
+    private readonly config: AppConfigService,
   ) {}
 
   /**
@@ -101,7 +107,7 @@ export class TicketsService {
         severity: dto.severity ?? finding.severity,
         module: dto.module ?? finding.module,
         build: dto.build ?? finding.build,
-        labels: dto.labels ?? '',
+        labels: splitLabels(dto.labels),
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         assigneeId: dto.assigneeId ?? null,
         reporterId: actor.sub,
@@ -122,7 +128,229 @@ export class TicketsService {
     }
 
     this.logger.log(`${ticketKey} created from ${bugKey} by ${actor.email}`);
-    return ticket;
+
+    // ------------------------------------------------- file it, and say so
+    // Awaited, unlike the email. A ticket whose whole purpose is to appear in
+    // Jira should not return "created" to the UI before we know whether it
+    // did - the user would close the dialog believing it was filed. The push
+    // records its own failure on the ticket, so an error here never loses the
+    // local ticket.
+    let pushed: Awaited<ReturnType<typeof this.pushToTracker>> | null = null;
+    if (this.trackers.autoPushEnabled) {
+      pushed = await this.pushToTracker(ticket.id, actor, { silentIfUnconfigured: true });
+    }
+
+    this.notifyBugFiled(ticket.id, actor);
+
+    // Re-read only when the push changed the row, so the common path stays a
+    // single query.
+    return pushed?.ok ? this.findOne(ticket.id) : ticket;
+  }
+
+  /**
+   * FILE THIS TICKET IN THE EXTERNAL TRACKER (Jira, ClickUp or Linear).
+   *
+   * Also the retry path: a push that failed leaves the reason on the ticket and
+   * this is what the "Retry" button calls.
+   *
+   * IDEMPOTENT. `externalRequestId` is written BEFORE the call and checked on
+   * entry, so a double-click, an impatient retry, or a timeout followed by a
+   * retry cannot create two issues for one bug. Duplicated bug reports are the
+   * fastest way for a team to stop trusting an automated reporter.
+   */
+  async pushToTracker(
+    id: string,
+    actor: JwtPayload,
+    options: { silentIfUnconfigured?: boolean } = {},
+  ): Promise<{ ok: boolean; detail: string; key?: string; url?: string; warnings?: string[] }> {
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: {
+        finding: {
+          select: {
+            id: true,
+            bugKey: true,
+            severity: true,
+            priority: true,
+            aiEvidence: true,
+            run: { select: { targetUrl: true } },
+            testCase: { select: { pageUrl: true } },
+            result: { select: { screenshotPath: true, tracePath: true } },
+          },
+        },
+      },
+    });
+    if (!ticket) throw new NotFoundException(`Ticket ${id} not found`);
+
+    // Already filed. Return the existing issue rather than creating a second.
+    if (ticket.externalUrl && ticket.externalKey) {
+      return {
+        ok: true,
+        detail: `Already filed as ${ticket.externalKey}.`,
+        key: ticket.externalKey,
+        url: ticket.externalUrl,
+      };
+    }
+
+    const status = this.trackers.status();
+    if (!status.enabled) {
+      const detail =
+        status.provider === 'none'
+          ? 'No issue tracker is configured. Set TRACKER_PROVIDER in backend/.env to jira, clickup or linear.'
+          : `${status.provider} is selected but missing: ${status.missingConfig.join(', ')}.`;
+      // On auto-push we stay quiet: an unconfigured tracker is a deployment
+      // choice, not an error the person creating a ticket caused.
+      if (options.silentIfUnconfigured) {
+        this.logger.debug(`Not pushing ${ticket.key}: ${detail}`);
+        return { ok: false, detail };
+      }
+      throw new BadRequestException(detail);
+    }
+
+    const bugKey = ticket.finding?.bugKey ?? ticket.key;
+
+    // The idempotency key is claimed first. Two concurrent pushes race here,
+    // and the loser sees a row that already has one.
+    const requestId = `${ticket.id}:${status.provider}`;
+    await this.prisma.ticket.update({
+      where: { id },
+      data: { externalRequestId: requestId, externalProvider: status.provider },
+    });
+
+    const attachments = await this.trackers.collectAttachments({
+      screenshotPath: ticket.finding?.result?.screenshotPath,
+      tracePath: ticket.finding?.result?.tracePath,
+      bugKey,
+    });
+
+    try {
+      const issue = await this.trackers.createIssue({
+        title: ticket.title,
+        markdown: ticket.description,
+        priority: ticket.priority,
+        severity: ticket.severity,
+        labels: ticket.labels,
+        attachments,
+        idempotencyKey: requestId,
+      });
+
+      await this.prisma.ticket.update({
+        where: { id },
+        data: {
+          externalKey: issue.key,
+          externalUrl: issue.url,
+          externalProvider: issue.provider,
+          externalSyncedAt: new Date(),
+        },
+      });
+
+      await this.event(
+        id,
+        'external',
+        null,
+        issue.key,
+        actor,
+        `Filed in ${issue.provider} as ${issue.key}` +
+          (issue.attachmentsUploaded
+            ? ` with ${issue.attachmentsUploaded} attachment(s).`
+            : '.') +
+          (issue.warnings.length ? ` Warnings: ${issue.warnings.join(' ')}` : ''),
+      );
+
+      this.logger.log(`${ticket.key} filed in ${issue.provider} as ${issue.key}`);
+      return {
+        ok: true,
+        detail: `Filed as ${issue.key} in ${issue.provider}.`,
+        key: issue.key,
+        url: issue.url,
+        warnings: issue.warnings,
+      };
+    } catch (err) {
+      const detail = describeError(err);
+
+      // Release the idempotency claim so a retry is possible - it exists to
+      // stop DOUBLE creation, not to make one failure permanent.
+      await this.prisma.ticket
+        .update({ where: { id }, data: { externalRequestId: null } })
+        .catch(() => undefined);
+
+      // Recorded on the ticket, not just logged. A confirmed bug that silently
+      // never reached the developers is the worst outcome this feature has.
+      await this.event(id, 'external', null, 'failed', actor, `Could not file: ${detail}`);
+      this.logger.warn(`Could not file ${ticket.key}: ${detail}`);
+
+      if (options.silentIfUnconfigured) return { ok: false, detail };
+      throw new BadRequestException(detail);
+    }
+  }
+
+  /** Confirms the tracker credentials without filing anything. */
+  trackerStatus() {
+    return this.trackers.status();
+  }
+
+  verifyTracker() {
+    return this.trackers.verify();
+  }
+
+  /**
+   * Tell the assignee, by email, that a confirmed defect is theirs.
+   *
+   * Fire-and-forget: a mail outage must not fail ticket creation. Read fresh so
+   * the message carries the external key when the push has just succeeded.
+   */
+  private notifyBugFiled(ticketId: string, actor: JwtPayload): void {
+    if (!this.config.mail.onBugFiled) return;
+
+    void (async () => {
+      try {
+        const t = await this.prisma.ticket.findUnique({
+          where: { id: ticketId },
+          include: {
+            assignee: { select: { name: true, email: true } },
+            reporter: { select: { name: true, email: true } },
+            finding: {
+              select: {
+                id: true,
+                bugKey: true,
+                run: { select: { targetUrl: true } },
+                testCase: { select: { pageUrl: true } },
+              },
+            },
+          },
+        });
+        if (!t) return;
+
+        // The assignee is the person who has to act. With nobody assigned it
+        // goes to the reporter, so a confirmed bug never lands in silence.
+        const recipient = t.assignee ?? t.reporter;
+        if (!recipient?.email) return;
+
+        await this.mail.sendBugFiled({
+          to: recipient.email,
+          name: recipient.name,
+          bugKey: t.finding?.bugKey ?? t.key,
+          ticketKey: t.key,
+          title: t.title,
+          severity: t.severity,
+          priority: t.priority,
+          targetUrl: t.finding?.run?.targetUrl,
+          pageUrl: t.finding?.testCase?.pageUrl,
+          findingId: t.findingId,
+          external:
+            t.externalKey && t.externalUrl
+              ? {
+                  provider: t.externalProvider ?? 'tracker',
+                  key: t.externalKey,
+                  url: t.externalUrl,
+                }
+              : null,
+          pushError: null,
+        });
+      } catch (err) {
+        this.logger.warn(`Could not send the bug-filed email: ${String(err)}`);
+      }
+    })();
   }
 
   findAll(filter: {
@@ -196,7 +424,7 @@ export class TicketsService {
         severity: dto.severity ?? undefined,
         module: dto.module ?? undefined,
         build: dto.build ?? undefined,
-        labels: dto.labels ?? undefined,
+        labels: dto.labels === undefined ? undefined : splitLabels(dto.labels),
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         assigneeId: dto.assigneeId ?? undefined,
         resolvedAt: dto.status === TicketStatus.RESOLVED ? new Date() : undefined,
@@ -427,4 +655,19 @@ function inferProvider(hostname: string): string {
   if (h.includes('github')) return 'github';
   if (h.includes('azure') || h.includes('visualstudio')) return 'azure';
   return 'other';
+}
+
+/**
+ * "ui, regression, p1" -> ['ui', 'regression', 'p1']
+ *
+ * One text field is what a person wants to type; an array is what the database
+ * should hold, so filtering by a label is an index lookup rather than a
+ * substring match that would make "ui" match "build".
+ */
+function splitLabels(input?: string): string[] {
+  return (input ?? '')
+    .split(',')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 20);
 }

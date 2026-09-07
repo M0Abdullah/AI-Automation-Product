@@ -44,6 +44,8 @@ export const envSchema = z.object({
   PUBLIC_API_URL: z.string().url().default('http://localhost:4000'),
 
   // --- database ---
+  // MongoDB connection string, e.g. mongodb://localhost:27017/aitest or an
+  // Atlas mongodb+srv:// URL. Prisma needs the database name in the path.
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
   // --- llm ---
@@ -122,8 +124,72 @@ export const envSchema = z.object({
     'deactivate',
     'unsubscribe',
   ]),
-  MAX_TEST_CASES_PER_RUN: int(12, 1),
+  // The run-wide ceiling. With whole-app mode this is a total across every
+  // page, so it is much higher than the old single-page value - but it is still
+  // a hard stop, because 200 unreviewed test cases is not a reviewable plan.
+  MAX_TEST_CASES_PER_RUN: int(60, 1),
+  // The per-page allowance. 8 is what a single-page run used to get, so a
+  // one-page run behaves exactly as it did before whole-app mode existed.
+  MAX_TEST_CASES_PER_PAGE: int(8, 1),
   MAX_STEPS_PER_CASE: int(25, 1),
+
+  // --- whole-app crawl ---
+  // Defaults for a run that does not specify its own. The real cost is one
+  // page scan plus one LLM call per page, so the ceilings are deliberately
+  // modest - CRAWL_MAX_PAGES_HARD is the limit a user cannot raise from the UI.
+  CRAWL_DEFAULT_MAX_PAGES: int(10, 1),
+  CRAWL_DEFAULT_MAX_DEPTH: int(2, 1),
+  CRAWL_MAX_PAGES_HARD: int(50, 1),
+  CRAWL_MAX_DEPTH_HARD: int(5, 1),
+
+  // --- issue tracker (Jira / ClickUp / Linear) -----------------------------
+  // Which tracker confirmed bugs are filed into. 'none' keeps everything local.
+  TRACKER_PROVIDER: z.enum(['none', 'jira', 'clickup', 'linear']).default('none'),
+  // Push automatically when a HUMAN confirms a finding and a ticket is created.
+  // Never on a bare test failure - see the comment in tracker.service.ts.
+  TRACKER_AUTO_PUSH: bool(false),
+  TRACKER_TIMEOUT_MS: int(20000, 1000),
+
+  // Jira Cloud. The token is an API token, NOT the account password.
+  JIRA_BASE_URL: z.string().default(''),
+  JIRA_EMAIL: z.string().default(''),
+  JIRA_API_TOKEN: z.string().default(''),
+  JIRA_PROJECT_KEY: z.string().default(''),
+  JIRA_ISSUE_TYPE: z.string().default('Bug'),
+
+  // ClickUp. LIST id, not a Space or Folder id.
+  CLICKUP_API_TOKEN: z.string().default(''),
+  CLICKUP_LIST_ID: z.string().default(''),
+  CLICKUP_STATUS: z.string().default(''),
+
+  // Linear. LINEAR_TEAM accepts the team key ("ENG") or its UUID.
+  LINEAR_API_KEY: z.string().default(''),
+  LINEAR_TEAM: z.string().default(''),
+
+  // --- email notifications -------------------------------------------------
+  // Off by default: the platform must run with no mail server at all.
+  MAIL_ENABLED: bool(false),
+  MAIL_HOST: z.string().default(''),
+  MAIL_PORT: int(587, 1),
+  // Leave unset to derive from the port (465 = implicit TLS, 587 = STARTTLS).
+  MAIL_SECURE: z
+    .enum(['true', 'false', ''])
+    .default('')
+    .transform((v) => (v === '' ? undefined : v === 'true')),
+  MAIL_USER: z.string().default(''),
+  MAIL_PASSWORD: z.string().default(''),
+  // The From header, e.g. "AI QA <qa@yourcompany.com>".
+  MAIL_FROM: z.string().default(''),
+  MAIL_TIMEOUT_MS: int(15000, 1000),
+  // Where the FRONTEND is reachable. Every link in an email is built from it,
+  // so localhost produces emails that only work on the developer's machine.
+  APP_PUBLIC_URL: z.string().url().default('http://localhost:3000'),
+
+  // Which notifications to send. Separate switches because they have very
+  // different audiences: a sign-in alert is security, a run summary is work.
+  MAIL_ON_LOGIN: bool(true),
+  MAIL_ON_RUN_FINISHED: bool(true),
+  MAIL_ON_BUG_FILED: bool(true),
 });
 
 export type Env = z.infer<typeof envSchema>;

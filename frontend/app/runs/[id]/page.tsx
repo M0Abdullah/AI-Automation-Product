@@ -9,6 +9,7 @@ import { FindingCard } from '../../../components/FindingCard';
 import { PageScanPanel } from '../../../components/PageScanPanel';
 import { RunStatusBadge } from '../../../components/StatusBadge';
 import { TestCaseCard } from '../../../components/TestCaseCard';
+import { RunPagesPanel } from '../../../components/RunPagesPanel';
 import {
   ApiError,
   POLL_INTERVAL_MS,
@@ -32,7 +33,7 @@ import { IN_PROGRESS_STATUSES, type RunDetail } from '../../../lib/types';
  * not things you read every time.
  */
 
-type Tab = 'cases' | 'failures' | 'wording' | 'design' | 'details';
+type Tab = 'cases' | 'pages' | 'failures' | 'wording' | 'design' | 'details';
 
 export default function RunPage() {
   const params = useParams<{ id: string }>();
@@ -125,6 +126,17 @@ export default function RunPage() {
   const hasRun = s.executed > 0;
   const allGood = hasRun && s.failed === 0 && s.errored === 0 && s.flaky === 0;
 
+  // WHOLE-APP MODE. A single-page run still has one RunPage, so the switch is
+  // on the count rather than on run.crawlEnabled - that way a crawl that only
+  // found one page reads as the single-page run it effectively is.
+  const pages = run.pages ?? [];
+  const multiPage = pages.length > 1;
+  const pagesFailed = s.pagesFailed ?? 0;
+  // Links the crawler chose not to follow. Same table as the policy
+  // rejections, different question, so they are split apart for display.
+  const crawlSkipped = run.rejections.filter((r) => r.stage === 'CRAWL_SKIPPED');
+  const policyRejections = run.rejections.filter((r) => r.stage !== 'CRAWL_SKIPPED');
+
   return (
     <div className="stack">
       {/* ============================================================ header */}
@@ -135,15 +147,22 @@ export default function RunPage() {
               <h1 style={{ fontSize: 22 }}>{run.name}</h1>
               <RunStatusBadge status={run.status} />
             </div>
-            <a
-              href={run.targetUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mono faint"
-              style={{ wordBreak: 'break-all' }}
-            >
-              {run.targetUrl}
-            </a>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <a
+                href={run.targetUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mono faint"
+                style={{ wordBreak: 'break-all' }}
+              >
+                {run.targetUrl}
+              </a>
+              {multiPage && (
+                <span className="pill" title="This run covers the whole app">
+                  whole app &middot; {pages.length} pages
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="row">
@@ -187,7 +206,11 @@ export default function RunPage() {
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <strong>
                     {run.status === 'SCANNING'
-                      ? 'Reading the page in Chrome…'
+                      ? run.crawlEnabled && !pages.length
+                        ? 'Finding the pages of your app in Chrome…'
+                        : multiPage
+                          ? `Reading ${pages.length} pages in Chrome…`
+                          : 'Reading the page in Chrome…'
                       : run.status === 'PLANNING'
                         ? 'The AI is writing your tests…'
                         : `Testing ${Math.min(s.executed + 1, s.approvedCases)} of ${s.approvedCases} in Chrome…`}
@@ -286,10 +309,20 @@ export default function RunPage() {
         <TabButton current={tab} id="cases" onClick={setTab} count={run.testCases.length}>
           Tests
         </TabButton>
+        {/* Only when the run covers more than one page. On a single-page run
+            the tab would restate the header and nothing else. */}
+        {multiPage && (
+          <TabButton current={tab} id="pages" onClick={setTab} count={pages.length}>
+            Pages
+            {pagesFailed > 0 && (
+              <span className="badge badge-fail badge-plain">{pagesFailed} not tested</span>
+            )}
+          </TabButton>
+        )}
         <TabButton current={tab} id="failures" onClick={setTab} count={run.findings.length}>
           Failures
           {openFindings.length > 0 && (
-            <span className="badge badge-warn">{openFindings.length} to review</span>
+            <span className="badge badge-warn badge-plain">{openFindings.length} to review</span>
           )}
         </TabButton>
         {/* Only offered when there is something to review. An always-visible
@@ -322,11 +355,55 @@ export default function RunPage() {
                 'No tests were produced. Open Details to see why.'
               )}
             </div>
+          ) : multiPage ? (
+            /*
+              GROUPED BY PAGE.
+              A flat list of 40 cases across 9 screens is unreviewable: the
+              reviewer cannot tell whether a case belongs on the page it names,
+              which is the single judgement approval asks for. The page heading
+              supplies that context once instead of per card.
+            */
+            groupByPage(run.testCases, pages).map(([page, cases]) => (
+              <div key={page.key} className="stack-sm">
+                <div className="row" style={{ marginTop: 6, flexWrap: 'wrap' }}>
+                  <strong className="mono">{page.path}</strong>
+                  <span className="faint">
+                    {cases.length} test{cases.length === 1 ? '' : 's'}
+                  </span>
+                  {page.title && <span className="faint">&middot; {page.title}</span>}
+                </div>
+                {cases.map((tc) => (
+                  <TestCaseCard key={tc.id} testCase={tc} onChanged={load} />
+                ))}
+              </div>
+            ))
           ) : (
             run.testCases.map((tc) => (
               <TestCaseCard key={tc.id} testCase={tc} onChanged={load} />
             ))
           )}
+
+          {/* The honest caveat, on the tab where approval happens. */}
+          {multiPage && pagesFailed > 0 && (
+            <div className="banner banner-warn">
+              <div>
+                <strong>
+                  {pagesFailed} of {pages.length} pages have no tests.
+                </strong>
+                <div style={{ fontWeight: 400, marginTop: 2 }}>
+                  A green result below says nothing about {pagesFailed === 1 ? 'it' : 'them'}.
+                  Open the <strong>Pages</strong> tab for the reason against each one.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- pages */}
+      {tab === 'pages' && (
+        <div className="card">
+          <RunPagesPanel runId={run.id} pages={pages} skipped={crawlSkipped} />
         </div>
       )}
 
@@ -347,7 +424,11 @@ export default function RunPage() {
       {/* ----------------------------------------------------------- wording */}
       {tab === 'wording' && (
         <div className="card">
-          <ContentIssuesPanel issues={run.contentIssues ?? []} onPromoted={load} />
+          <ContentIssuesPanel
+            issues={run.contentIssues ?? []}
+            showPage={multiPage}
+            onPromoted={load}
+          />
         </div>
       )}
 
@@ -357,6 +438,9 @@ export default function RunPage() {
           <DesignIssuesPanel
             issues={run.designIssues ?? []}
             summary={run.designSpecSummary}
+            // Stated explicitly, because on a whole-app run the natural
+            // assumption is that every page was checked - and it was not.
+            pageUrl={multiPage ? (run.designPageUrl ?? run.targetUrl) : null}
             onPromoted={load}
           />
         </div>
@@ -421,7 +505,7 @@ export default function RunPage() {
             </div>
           </div>
 
-          {run.rejections.length > 0 && (
+          {policyRejections.length > 0 && (
             <div className="card">
               <div className="card-head">
                 <div>
@@ -429,13 +513,16 @@ export default function RunPage() {
                   <span className="faint">
                     Things the safety gate refused, and what the AI said it could not test. None of
                     this reached a browser.
+                    {multiPage
+                      ? ' Links the crawler chose not to follow are listed under Pages instead.'
+                      : ''}
                   </span>
                 </div>
               </div>
               <div className="scroll-x">
                 <table className="data">
                   <tbody>
-                    {run.rejections.map((r) => (
+                    {policyRejections.map((r) => (
                       <tr key={r.id}>
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <span
@@ -449,6 +536,14 @@ export default function RunPage() {
                           >
                             {r.stage.replace(/_/g, ' ').toLowerCase()}
                           </span>
+                          {/* Which page's plan this came from. On a whole-app
+                              run "the model could not test this" is meaningless
+                              without knowing where. */}
+                          {multiPage && r.pageUrl && (
+                            <div className="faint mono" style={{ fontSize: 11, marginTop: 3 }}>
+                              {new URL(r.pageUrl).pathname}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <div style={{ fontWeight: 550 }}>{r.subject}</div>
@@ -532,4 +627,37 @@ function TabButton({
       {typeof count === 'number' && count > 0 && <span className="tab-count">{count}</span>}
     </button>
   );
+}
+
+/**
+ * Test cases bucketed by the page they were written for, in crawl order.
+ *
+ * Cases whose page is missing (hand-written, or from a run that predates
+ * whole-app mode) are collected under the entry page rather than dropped - a
+ * test that vanishes from the list is far worse than one filed slightly wrong.
+ */
+function groupByPage(
+  cases: RunDetail['testCases'],
+  pages: RunDetail['pages'],
+): Array<[{ key: string; path: string; title?: string | null }, RunDetail['testCases']]> {
+  const order = new Map(pages.map((p, i) => [p.id, i]));
+  const buckets = new Map<string, RunDetail['testCases']>();
+
+  const fallback = pages.find((p) => p.isEntry) ?? pages[0];
+  for (const c of cases) {
+    const key = c.pageId && order.has(c.pageId) ? c.pageId : (fallback?.id ?? 'unknown');
+    const list = buckets.get(key) ?? [];
+    list.push(c);
+    buckets.set(key, list);
+  }
+
+  return [...buckets.entries()]
+    .sort((a, b) => (order.get(a[0]) ?? 999) - (order.get(b[0]) ?? 999))
+    .map(([id, list]) => {
+      const page = pages.find((p) => p.id === id);
+      return [
+        { key: id, path: page?.path ?? 'Other tests', title: page?.title },
+        list,
+      ] as [{ key: string; path: string; title?: string | null }, RunDetail['testCases']];
+    });
 }

@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { resolveChecks } from '../common/check-catalog';
-import { packTags, unpackTags } from '../common/db-json';
+import { normaliseUrl } from '../browser/site-crawler.service';
 import { OPEN_FINDING_STATUSES, RunStatus } from '../common/enums';
-import { hydrateRun } from '../common/hydrate';
+import { AppConfigService } from '../config/app-config.service';
 import { PolicyService } from '../policy/policy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -20,6 +20,7 @@ export class RunsService {
     private readonly pipeline: RunPipelineService,
     private readonly secrets: SecretsService,
     private readonly policy: PolicyService,
+    private readonly config: AppConfigService,
   ) {}
 
   /**
@@ -73,17 +74,46 @@ export class RunsService {
       }
     }
 
+    // The design page, when given, must be part of the same app. Otherwise the
+    // Figma comparison silently measures somebody else's site.
+    if (dto.designPageUrl) {
+      const designOrigin = new URL(dto.designPageUrl).origin;
+      if (designOrigin !== parsed.origin) {
+        throw new BadRequestException(
+          `The design page must be on the site under test. Target is ${parsed.origin}, ` +
+            `the design page is ${designOrigin}.`,
+        );
+      }
+    }
+
+    // WHOLE-APP SCOPE, clamped server-side.
+    //
+    // The UI offers sensible numbers, but the ceiling is enforced here because
+    // the cost is real: every page is a browser scan plus an LLM call, so a
+    // crafted request asking for 10,000 pages would spend hours of browser time
+    // and an entire API quota.
+    const crawlEnabled = Boolean(dto.crawlEnabled);
+    const { defaultMaxPages, defaultMaxDepth, maxPagesHard, maxDepthHard } = this.config.crawl;
+    const maxPages = clamp(dto.maxPages ?? defaultMaxPages, 1, maxPagesHard);
+    const maxDepth = clamp(dto.maxDepth ?? defaultMaxDepth, 1, maxDepthHard);
+
     const project = await this.projects.findOrCreateForUrl(dto.url, dto.name);
 
     const run = await this.prisma.run.create({
       data: {
         projectId: project.id,
-        name: dto.name?.trim() || defaultRunName(dto.url),
+        name: dto.name?.trim() || defaultRunName(dto.url, crawlEnabled),
         targetUrl: dto.url,
         requirements: requirements,
-        checks: packTags(checks.map((c) => c.id)),
+        checks: checks.map((c) => c.id),
         authorized: dto.authorized,
         allowDestructive: Boolean(dto.allowDestructive),
+        // Whole-app scope.
+        crawlEnabled,
+        maxPages,
+        maxDepth,
+        includePaths: cleanPaths(dto.includePaths),
+        excludePaths: cleanPaths(dto.excludePaths),
         // Sign-in configuration. Trimmed to null rather than kept as '' so
         // `if (run.loginUrl)` is a reliable "should we sign in" test.
         loginUrl: dto.loginUrl?.trim() || null,
@@ -93,6 +123,10 @@ export class RunsService {
         // Accept a whole Figma URL as well as a bare key - people paste the URL.
         figmaFileKey: parseFigmaFileKey(dto.figmaFileKey),
         figmaNodeId: normaliseNodeId(dto.figmaNodeId),
+        // Which single page the Figma frame describes. Defaults to the entry
+        // URL, which is the right answer for a single-page run and the most
+        // likely one for a whole-app run - the user pasted both together.
+        designPageUrl: dto.designPageUrl?.trim() ? normaliseUrl(dto.designPageUrl.trim()) : null,
         status: RunStatus.CREATED,
         statusMessage: 'Queued',
         // WHO started this run. Without it every run is anonymous and everyone
@@ -142,7 +176,10 @@ export class RunsService {
         finishedAt: true,
         createdBy: { select: { id: true, name: true, email: true } },
         project: { select: { id: true, name: true } },
-        _count: { select: { testCases: true, findings: true } },
+        crawlEnabled: true,
+        // Page count is what tells a whole-app run apart from a single-page one
+        // at a glance, so the list needs it.
+        _count: { select: { testCases: true, findings: true, pages: true } },
       },
     });
   }
@@ -154,6 +191,29 @@ export class RunsService {
       include: {
         project: { select: { id: true, name: true, baseUrl: true } },
         createdBy: { select: { id: true, name: true, email: true } },
+        // Every page in the run, with its own status and why it failed.
+        // Deliberately without pageSnapshot: twelve snapshots is megabytes on
+        // a payload the UI polls every couple of seconds. The snapshot is
+        // fetched per page by GET /api/runs/:id/pages/:pageId.
+        pages: {
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            url: true,
+            path: true,
+            title: true,
+            isEntry: true,
+            discoveredFrom: true,
+            depth: true,
+            order: true,
+            status: true,
+            statusMessage: true,
+            elementCount: true,
+            scannedAt: true,
+            plannedAt: true,
+            _count: { select: { testCases: true, contentIssues: true, designIssues: true } },
+          },
+        },
         testCases: {
           orderBy: { order: 'asc' },
           include: {
@@ -205,10 +265,11 @@ export class RunsService {
       .findUnique({ where: { runId: id } })
       .then((s) => Boolean(s?.emailCipher || s?.passwordCipher));
 
-    // hydrateRun turns the SQLite JSON-text columns back into real objects, so
-    // the response shape is identical to what PostgreSQL jsonb would give.
+    // No hydration step any more: MongoDB stores steps, assertions and the page
+    // snapshot as real documents, so what the driver returns is already the
+    // response shape.
     return {
-      ...hydrateRun(run as unknown as Record<string, unknown>),
+      ...run,
       hasCredentials,
       summary: summarise(run),
     };
@@ -250,29 +311,90 @@ export class RunsService {
     return { started: true, approvedCount: approved };
   }
 
-  /** Re-plan from scratch: scan again and ask the model again. */
+  /**
+   * Re-plan: scan every page of the run again and ask the model again.
+   *
+   * The set of PAGES is deliberately kept. Re-crawling would spend another
+   * minute of browser time rediscovering the same URLs, and worse, a nav bar
+   * that changed in the meantime would quietly change what the run covers - so
+   * "re-plan" would stop meaning "plan the same thing again". Use a new run to
+   * pick up new pages.
+   *
+   * Written as sequential awaits rather than prisma.$transaction([...]).
+   * MongoDB only supports multi-document transactions on a replica set, and
+   * requiring one to re-plan would mean a single mongod could not run this
+   * platform at all. Each step here is independently safe: worst case a crash
+   * between them leaves a run with its rejections cleared, which the re-plan
+   * about to run would have rewritten anyway.
+   */
   async replan(id: string) {
     const run = await this.prisma.run.findUnique({ where: { id } });
     if (!run) throw new NotFoundException(`Run ${id} not found`);
 
     // Human-authored cases are kept - only the AI's proposals are regenerated.
-    await this.prisma.$transaction([
-      this.prisma.testCase.deleteMany({ where: { runId: id, source: 'LLM' } }),
-      this.prisma.policyRejection.deleteMany({ where: { runId: id } }),
-      this.prisma.run.update({
-        where: { id },
-        data: { status: RunStatus.CREATED, statusMessage: 'Re-planning', finishedAt: null },
-      }),
-    ]);
+    await this.prisma.testCase.deleteMany({ where: { runId: id, source: 'LLM' } });
+    await this.prisma.policyRejection.deleteMany({ where: { runId: id } });
+    // Advisory rows are regenerated too, so a re-plan does not leave two copies
+    // of every typo. Dismissals live on the row, so this does lose them - which
+    // is why it happens only on an explicit re-plan.
+    //
+    // A row a human already PROMOTED into a bug is kept: deleting it would take
+    // the finding's evidence with it and leave a BUG-00n pointing at nothing.
+    // Selected by id rather than with a `finding: null` relation filter, because
+    // the foreign key lives on Finding - so the ids are what we actually have.
+    const promoted = await this.prisma.finding.findMany({
+      where: { runId: id },
+      select: { contentIssueId: true, designIssueId: true },
+    });
+    await this.prisma.contentIssue.deleteMany({
+      where: {
+        runId: id,
+        id: { notIn: promoted.map((f) => f.contentIssueId).filter(isId) },
+      },
+    });
+    await this.prisma.designIssue.deleteMany({
+      where: {
+        runId: id,
+        id: { notIn: promoted.map((f) => f.designIssueId).filter(isId) },
+      },
+    });
+    await this.prisma.run.update({
+      where: { id },
+      data: { status: RunStatus.CREATED, statusMessage: 'Re-planning', finishedAt: null },
+    });
 
     this.pipeline.startPlanning(id);
     return { started: true };
   }
+
+  /**
+   * One page's snapshot — what the AI was shown for THAT page.
+   *
+   * Split out of findOne because a twelve-page run's snapshots total several
+   * megabytes, and findOne is polled every couple of seconds while a run is in
+   * progress. The panel that shows it is opened on demand, so it can fetch on
+   * demand too.
+   */
+  async findPage(runId: string, pageId: string) {
+    const page = await this.prisma.runPage.findFirst({
+      where: { id: pageId, runId },
+      include: {
+        contentIssues: { orderBy: [{ confidence: 'desc' }, { createdAt: 'asc' }] },
+        designIssues: { orderBy: [{ offBy: 'asc' }, { createdAt: 'asc' }] },
+        testCases: { orderBy: { order: 'asc' }, select: { id: true, title: true, priority: true } },
+      },
+    });
+    if (!page) throw new NotFoundException(`Page ${pageId} not found on run ${runId}`);
+    return page;
+  }
 }
 
-function defaultRunName(url: string): string {
+function defaultRunName(url: string, wholeApp: boolean): string {
   try {
     const u = new URL(url);
+    // A whole-app run is named after the app, not the entry page - calling a
+    // twelve-page run "example.com - login" would be actively misleading.
+    if (wholeApp) return `${u.hostname} - whole app`;
     const p = u.pathname === '/' ? 'home' : u.pathname.replace(/^\//, '').replace(/\/$/, '');
     return `${u.hostname} - ${p}`;
   } catch {
@@ -280,8 +402,22 @@ function defaultRunName(url: string): string {
   }
 }
 
+/** Keeps a user-supplied number inside what the server is willing to do. */
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/** Trims, drops empties, and caps the list so a filter cannot become a payload. */
+function cleanPaths(input?: string[]): string[] {
+  return (input ?? [])
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
 /** Counts the frontend needs for the header, computed once here. */
 function summarise(run: {
+  pages?: Array<{ status: string }>;
   testCases: Array<{
     approved: boolean;
     rejected: boolean;
@@ -296,7 +432,18 @@ function summarise(run: {
     tc.results.length ? tc.results[tc.results.length - 1].status : null,
   );
 
+  const pages = run.pages ?? [];
+
   return {
+    // Page totals lead, because on a whole-app run "3 of 12 pages could not be
+    // read" is the single most important thing on the screen - a run that looks
+    // green while a quarter of the app was unreachable is a lie.
+    totalPages: pages.length,
+    pagesPlanned: pages.filter((p) => p.status === 'PLANNED').length,
+    pagesFailed: pages.filter((p) => p.status === 'SCAN_FAILED' || p.status === 'PLAN_FAILED')
+      .length,
+    pagesSkipped: pages.filter((p) => p.status === 'SKIPPED').length,
+
     totalCases: run.testCases.length,
     approvedCases: run.testCases.filter((c) => c.approved && !c.rejected).length,
     rejectedCases: run.testCases.filter((c) => c.rejected).length,
@@ -329,4 +476,9 @@ function normaliseNodeId(input?: string): string | null {
   if (!raw) return null;
   const fromUrl = raw.match(/node-id=([0-9]+[-:][0-9]+)/);
   return (fromUrl ? fromUrl[1] : raw).replace('-', ':');
+}
+
+/** Narrows a nullable id list to the ids that are actually set. */
+function isId(v: string | null): v is string {
+  return typeof v === 'string' && v.length > 0;
 }

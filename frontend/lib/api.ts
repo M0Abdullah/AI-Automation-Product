@@ -10,6 +10,9 @@ import type {
   ResultDetail,
   RunDetail,
   RunListItem,
+  RunPageDetail,
+  IntegrationStatus,
+  TrackerStatus,
   TeamMember,
   TestCase,
   Ticket,
@@ -172,6 +175,13 @@ export const getDashboard = () => request<DashboardOverview>('/dashboard');
 // -------------------------------------------------------------------- runs
 
 export interface CreateRunInput {
+  /**
+   * The ENTRY url.
+   *
+   * With crawlEnabled it is the front door of the app and every other page is
+   * discovered from it. Without, it is the one page under test. Either way it
+   * is the only URL the user has to type.
+   */
   url: string;
   /** Optional now: ticked checks alone are a valid run. */
   requirements?: string;
@@ -189,6 +199,32 @@ export interface CreateRunInput {
   figmaFileKey?: string;
   /** Figma node id ("18:0"), or the whole URL containing node-id=. */
   figmaNodeId?: string;
+  /**
+   * WHICH page the Figma frame describes. Defaults to `url`.
+   *
+   * The design comparison is single-page even on a whole-app run, because a
+   * Figma frame IS one screen. This is how a run says "crawl everything, but
+   * compare the design against /settings".
+   */
+  designPageUrl?: string;
+
+  // ------------------------------------------------------------- whole app ---
+  /**
+   * TEST THE WHOLE APP rather than one URL.
+   *
+   * The backend follows same-origin links from `url`, then scans, plans and
+   * runs tests against every page it finds - one run, one approval gate, one
+   * findings list.
+   */
+  crawlEnabled?: boolean;
+  /** Page budget. Each page costs a browser scan plus an LLM call. */
+  maxPages?: number;
+  /** Link depth from the entry URL. 1 = only what the entry page links to. */
+  maxDepth?: number;
+  /** Only crawl paths containing one of these. Empty = the whole origin. */
+  includePaths?: string[];
+  /** Skip paths containing one of these. Sign-out is always skipped anyway. */
+  excludePaths?: string[];
   /** Explicit control labels, when the sign-in form cannot be auto-detected. */
   loginEmailField?: string;
   loginPassField?: string;
@@ -203,6 +239,15 @@ export const createRun = (input: CreateRunInput) =>
 export const listRuns = () => request<RunListItem[]>('/runs');
 
 export const getRun = (id: string) => request<RunDetail>(`/runs/${id}`);
+
+/**
+ * One page of a run, with its snapshot and its advisory lists.
+ *
+ * Separate from getRun because a twelve-page run's snapshots are megabytes and
+ * getRun is polled every couple of seconds while the run is in progress.
+ */
+export const getRunPage = (runId: string, pageId: string) =>
+  request<RunPageDetail>(`/runs/${runId}/pages/${pageId}`);
 
 /**
  * Review an advisory content issue.
@@ -350,6 +395,40 @@ export const updateTicket = (
     title: string;
   }>,
 ) => request<Ticket>(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+/**
+ * WHICH TRACKER IS CONFIGURED, if any.
+ *
+ * Drives whether the UI offers "Push to Jira" at all. Showing a button that
+ * cannot work is worse than not showing it — the user presses it, gets an
+ * error about an env var, and concludes the feature is broken.
+ */
+export const getTrackerStatus = () => request<TrackerStatus>('/trackers/status');
+
+/** Everything this instance is wired up to — tracker and email. No secrets. */
+export const getIntegrations = () => request<IntegrationStatus>('/integrations');
+
+/** Checks the SMTP credentials. Does NOT send a test message. */
+export const verifyMail = () =>
+  request<{ ok: boolean; detail: string }>('/integrations/mail/verify', { method: 'POST' });
+
+/** Checks the tracker credentials. Does NOT file a test issue. */
+export const verifyTracker = () =>
+  request<{ ok: boolean; provider: string; detail: string }>('/trackers/verify', {
+    method: 'POST',
+  });
+
+/**
+ * File this ticket in the configured tracker, or retry a failed push.
+ *
+ * Idempotent server-side: a ticket already filed returns its existing issue
+ * rather than creating a second one.
+ */
+export const pushTicket = (id: string) =>
+  request<{ ok: boolean; detail: string; key?: string; url?: string; warnings?: string[] }>(
+    `/tickets/${id}/push`,
+    { method: 'POST' },
+  );
 
 export const commentOnTicket = (id: string, body: string) =>
   request<Ticket>(`/tickets/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) });

@@ -55,9 +55,23 @@ export class PolicyService {
    * @param cases            what the LLM returned (already schema-valid)
    * @param targetUrl        the URL the user authorised
    * @param allowDestructive did the user explicitly allow risky actions
+   * @param limit            how many cases may be accepted from THIS plan.
+   *
+   * `limit` exists because a whole-app run reviews one plan per page, and the
+   * per-run ceiling is the wrong ceiling for a single page: applied twelve
+   * times it would let one run reach twelve times its cap, while applied
+   * globally it would let page 1 spend the entire budget and leave pages 2-12
+   * with no tests at all. The caller passes the per-page allowance and keeps
+   * the run-wide total itself.
    */
-  review(cases: TestCasePlan[], targetUrl: string, allowDestructive: boolean): PolicyOutcome {
+  review(
+    cases: TestCasePlan[],
+    targetUrl: string,
+    allowDestructive: boolean,
+    limit?: number,
+  ): PolicyOutcome {
     const { maxTestCasesPerRun, maxStepsPerCase } = this.config.policy;
+    const cap = limit ?? maxTestCasesPerRun;
     const accepted: TestCasePlan[] = [];
     const rejections: Rejection[] = [];
 
@@ -74,11 +88,14 @@ export class PolicyService {
     }
 
     for (const [i, tc] of cases.entries()) {
-      if (accepted.length >= maxTestCasesPerRun) {
+      if (accepted.length >= cap) {
         rejections.push({
           stage: 'LIMIT_EXCEEDED',
           subject: tc.title,
-          reason: `Run is capped at ${maxTestCasesPerRun} test cases (MAX_TEST_CASES_PER_RUN)`,
+          reason:
+            limit === undefined
+              ? `Run is capped at ${cap} test cases (MAX_TEST_CASES_PER_RUN)`
+              : `This page is capped at ${cap} test cases (MAX_TEST_CASES_PER_PAGE)`,
         });
         continue;
       }

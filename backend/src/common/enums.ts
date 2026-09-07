@@ -1,13 +1,15 @@
 /**
  * STATUS VALUES.
  *
- * On PostgreSQL these were native database enums. SQLite has no enums, so they
- * live here as const objects instead — and the whole codebase imports them from
- * this one file rather than from @prisma/client.
+ * These are `String` columns in MongoDB with the allowed values defined here as
+ * const objects, and the whole codebase imports them from this one file rather
+ * than from @prisma/client.
  *
- * That indirection is the reason switching back to PostgreSQL later is cheap:
- * the string values are identical to the Postgres enum labels, so the migration
- * is a schema change plus a data copy, with no application code to rewrite.
+ * That indirection is deliberate and outlives the database choice: a status is
+ * written from about forty places, and a const object gives the same
+ * exhaustiveness checking a native enum would while leaving the storage a plain
+ * string. Moving to native Prisma enums later is a schema change with no
+ * application code to rewrite, because the labels are identical.
  */
 
 export const RunStatus = {
@@ -21,6 +23,26 @@ export const RunStatus = {
   COMPLETED: 'COMPLETED', // execution finished (may contain failures)
 } as const;
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
+
+/**
+ * PER-PAGE STATUS for a whole-app run.
+ *
+ * A twelve-page run is not one thing that succeeds or fails: page 3 can be
+ * unreachable while pages 1, 2 and 4-12 plan perfectly. Without a status per
+ * page, one dead link would have to either fail the whole run or vanish
+ * silently, and both are wrong. The Run status reports the aggregate; this
+ * reports the page.
+ */
+export const RunPageStatus = {
+  DISCOVERED: 'DISCOVERED', // the crawler found it, nothing read it yet
+  SCANNING: 'SCANNING', // Playwright is reading this page
+  SCANNED: 'SCANNED', // snapshot captured, awaiting its plan
+  PLANNED: 'PLANNED', // test cases proposed for this page
+  SCAN_FAILED: 'SCAN_FAILED', // unreachable, blocked, or rendered nothing
+  PLAN_FAILED: 'PLAN_FAILED', // the model or the policy engine produced nothing
+  SKIPPED: 'SKIPPED', // over the page budget, or excluded by the user
+} as const;
+export type RunPageStatus = (typeof RunPageStatus)[keyof typeof RunPageStatus];
 
 export const ResultStatus = {
   PASS: 'PASS',
@@ -172,6 +194,28 @@ export const Priority = {
   P3: 'P3',
 } as const;
 export type Priority = (typeof Priority)[keyof typeof Priority];
+
+/**
+ * FAMILIES OF DESIGN PROPERTY.
+ *
+ * The design comparison checks eleven properties now, which is too many to show
+ * as one flat list. Grouping them lets a reviewer read the classes they care
+ * about and dismiss a whole class they do not - "stop telling me about colours"
+ * is a reasonable thing to want, and far better than abandoning the tab.
+ */
+export const DesignIssueGroup = {
+  /** Widths, heights, button heights, corner radii. */
+  SIZE: 'SIZE',
+  /** Font size, family and weight. */
+  TYPOGRAPHY: 'TYPOGRAPHY',
+  /** Text, background and border colour. */
+  COLOUR: 'COLOUR',
+  /** Padding and gaps. */
+  SPACING: 'SPACING',
+  /** Icon dimensions - the square glyphs beside labels. */
+  ICON: 'ICON',
+} as const;
+export type DesignIssueGroup = (typeof DesignIssueGroup)[keyof typeof DesignIssueGroup];
 
 /** Counter names used for human-readable keys. */
 export const CounterName = {

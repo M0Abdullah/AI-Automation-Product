@@ -195,3 +195,45 @@ export function resolveChecks(ids: string[]): CheckDefinition[] {
 }
 
 export const DEFAULT_CHECK_IDS = CHECK_CATALOG.filter((c) => c.defaultOn).map((c) => c.id);
+
+/**
+ * WHICH CHECKS APPLY TO THIS PARTICULAR PAGE.
+ *
+ * Necessary as soon as a run covers a whole app rather than one screen. The
+ * user ticks "Login works" once, meaning "check that my app's login works" -
+ * but handing that instruction to all twelve pages would produce eleven test
+ * cases that hunt for a password field on the dashboard, fail with
+ * LOCATOR_NOT_FOUND, and fill the findings list with test defects. That is
+ * precisely the false-bug noise this platform exists to avoid, so the filtering
+ * happens here rather than being left to the model's judgement.
+ *
+ * Only the Login group is page-specific. Everything else - does it load, is the
+ * console clean, do the fields accept typing - is genuinely true of every page.
+ */
+export function checksForPage(args: {
+  checks: CheckDefinition[];
+  hasCredentials: boolean;
+  /** The page's final URL. */
+  url: string;
+  /** The page's title. */
+  title: string;
+  /** Did the scan find a password input? The strongest signal of the three. */
+  hasPasswordField: boolean;
+}): CheckDefinition[] {
+  const { checks, hasCredentials, url, title, hasPasswordField } = args;
+
+  // A password field is proof. The URL and title are corroboration for the apps
+  // that render the field late or hide it behind a "continue" step.
+  const looksLikeSignIn =
+    hasPasswordField || /(^|[^a-z])(login|log-in|signin|sign-in|auth)([^a-z]|$)/i.test(
+      `${url} ${title}`,
+    );
+
+  return checks.filter((c) => {
+    // A credential-dependent check with no credentials would ask the model to
+    // sign in with nothing.
+    if (c.requiresCredentials && !hasCredentials) return false;
+    if (c.group === 'Login') return looksLikeSignIn;
+    return true;
+  });
+}

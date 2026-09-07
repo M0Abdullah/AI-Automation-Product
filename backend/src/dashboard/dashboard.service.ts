@@ -50,8 +50,9 @@ export class DashboardService {
       this.prisma.run.count({ where: runWhere }),
       this.prisma.run.groupBy({ by: ['status'], where: runWhere, _count: true }),
 
-      // Latest result per test case. Pulled lean and reduced in JS: SQLite has no
-      // window functions through Prisma, and MVP volumes make this trivial.
+      // Latest result per test case. Pulled lean and reduced in JS rather than in
+      // the database: Prisma exposes no window function on MongoDB, and at these
+      // volumes the reduce is trivial.
       this.prisma.testCase.findMany({
         where: viaRun,
         select: {

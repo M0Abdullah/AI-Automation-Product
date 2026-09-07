@@ -71,10 +71,22 @@ The only thing the user has to fill in. Returns immediately; planning continues 
 
 ```json
 {
-  "url": "https://staging.example.com/login",
+  "url": "https://staging.example.com",
   "requirements": "A user can type an email.\nClicking Login with valid credentials opens the dashboard.\nA wrong password shows an error.",
-  "name": "Login smoke",
+  "name": "Staging smoke",
+  "checks": ["page_loads", "no_console_errors", "fields_accept_input"],
   "credentials": { "email": "test@example.com", "password": "secret" },
+  "loginUrl": "https://staging.example.com/login",
+
+  "crawlEnabled": true,
+  "maxPages": 12,
+  "maxDepth": 2,
+  "excludePaths": ["/admin", "?preview="],
+
+  "figmaFileKey": "https://www.figma.com/design/AbC123/Kit?node-id=18-0",
+  "figmaNodeId": "https://www.figma.com/design/AbC123/Kit?node-id=18-0",
+  "designPageUrl": "https://staging.example.com/login",
+
   "authorized": true,
   "allowDestructive": false
 }
@@ -82,14 +94,35 @@ The only thing the user has to fill in. Returns immediately; planning continues 
 
 | Field | Required | Notes |
 |---|---|---|
-| `url` | yes | Must include the protocol. Defines the only origin the run may touch. |
-| `requirements` | yes | Min 10 chars. The source of truth. |
-| `name` | no | Defaults to `host - path`. |
+| `url` | yes | Must include the protocol. Defines the only origin the run may touch. With `crawlEnabled` it is the **entry** URL every other page is discovered from. |
+| `requirements` | no* | The source of truth for business rules. *One of `requirements` (min 10 chars) or a non-empty `checks` is required. |
+| `checks` | no* | Ids from `GET /capabilities`. Unknown ids are dropped, not rejected. |
+| `name` | no | Defaults to `host - path`, or `host - whole app` when crawling. |
 | `credentials` | no | Encrypted immediately. Never returned by any endpoint. Never sent to the LLM. |
+| `loginUrl` | no | Must be the same origin as `url`. Signs in once **before** the crawl and the scans. |
 | `authorized` | yes | `false` → `400`. |
 | `allowDestructive` | no | Default `false`. |
 
-`400` when unauthorised or when the host is a private/metadata address.
+**Whole-app scope**
+
+| Field | Default | Notes |
+|---|---|---|
+| `crawlEnabled` | `false` | `true` discovers the app's pages by following same-origin links from `url`, then scans, plans and runs every check against each. |
+| `maxPages` | `CRAWL_DEFAULT_MAX_PAGES` (10) | Clamped to `CRAWL_MAX_PAGES_HARD` (50). Each page costs one browser scan plus one LLM call. |
+| `maxDepth` | `CRAWL_DEFAULT_MAX_DEPTH` (2) | Link depth from the entry URL. Clamped to `CRAWL_MAX_DEPTH_HARD` (5). |
+| `includePaths` | `[]` | A discovered path must contain one of these. Empty = the whole origin. |
+| `excludePaths` | `[]` | Skips matching paths, on top of the always-excluded set (sign-out, destructive words, assets). |
+
+**Design comparison**
+
+| Field | Notes |
+|---|---|
+| `figmaFileKey` | The file key, or the whole Figma URL — the backend parses either. |
+| `figmaNodeId` | `18:0`, `18-0`, or the whole URL containing `node-id=`. |
+| `designPageUrl` | **Which single page the frame is compared against.** Defaults to `url`. Must be the same origin. The design check stays single-page even when the run crawls the whole app — a Figma frame is one screen's design. |
+
+`400` when unauthorised, when the host is a private/metadata address, when `loginUrl` or
+`designPageUrl` is on a different origin, or when a `loginUrl` is given with no credentials.
 
 ### `GET /runs`
 
@@ -97,38 +130,113 @@ Last 50 runs with counts. Poll this for the dashboard list.
 
 ### `GET /runs/:id`
 
-**Everything the run page needs in one call**: the run, the page snapshot, all test cases with their results, all findings with their event history, all policy rejections, and a computed `summary`.
+**Everything the run page needs in one call**: the run, its pages, the entry page snapshot, all
+test cases with their results, all findings with their event history, all policy rejections, and a
+computed `summary`.
 
 ```json
 {
   "id": "…",
   "status": "AWAITING_APPROVAL",
-  "statusMessage": "5 test case(s) ready for review.",
+  "statusMessage": "31 test case(s) across 9 page(s), ready for review.",
+  "crawlEnabled": true,
+  "maxPages": 12,
+  "maxDepth": 2,
   "pageSnapshot": { "elements": [{ "kind": "input", "label": "Email", "labelSource": "label-for" }] },
+  "designPageUrl": "https://staging.example.com/login",
+  "designSpecSummary": "Kit in \"Design system\" - 2196 layers. … Compared against /login: 612 value(s) matched, 11 deviation(s) across 284 element(s) (5 colour, 3 size, 2 typography, 1 icon).",
   "llmModel": "openai/gpt-oss-120b",
-  "llmTokensIn": 1840,
-  "llmTokensOut": 920,
+  "llmTokensIn": 18400,
+  "llmTokensOut": 9200,
   "hasCredentials": true,
-  "testCases": [{ "id": "…", "title": "…", "steps": [], "assertions": [], "approved": false, "results": [] }],
+
+  "pages": [
+    {
+      "id": "…", "url": "https://staging.example.com/", "path": "/",
+      "title": "Staging", "isEntry": true, "depth": 0, "order": 0,
+      "status": "PLANNED", "statusMessage": "4 test case(s) proposed.",
+      "elementCount": 27,
+      "_count": { "testCases": 4, "contentIssues": 1, "designIssues": 0 }
+    },
+    {
+      "id": "…", "url": "https://staging.example.com/reports", "path": "/reports",
+      "isEntry": false, "discoveredFrom": "https://staging.example.com/", "depth": 1, "order": 4,
+      "status": "SCAN_FAILED",
+      "statusMessage": "The page never rendered any interactive content within 15000ms. …",
+      "elementCount": 0
+    }
+  ],
+
+  "testCases": [
+    { "id": "…", "pageId": "…", "pageUrl": "https://staging.example.com/",
+      "title": "…", "steps": [], "assertions": [], "approved": false, "results": [] }
+  ],
   "findings": [],
-  "rejections": [],
+  "rejections": [
+    { "id": "…", "stage": "CRAWL_SKIPPED", "subject": "https://staging.example.com/logout",
+      "reason": "Signing out would destroy the run's session", "pageUrl": null }
+  ],
   "summary": {
-    "totalCases": 5, "approvedCases": 0, "executed": 0,
+    "totalPages": 9, "pagesPlanned": 7, "pagesFailed": 1, "pagesSkipped": 1,
+    "totalCases": 31, "approvedCases": 0, "executed": 0,
     "passed": 0, "failed": 0, "errored": 0, "flaky": 0,
     "openFindings": 0, "confirmedFindings": 0
   }
 }
 ```
 
+`pages` is present on every run — a single-page run has exactly one entry, with `isEntry: true`.
+**`pageSnapshot` is deliberately omitted from each page here**: a twelve-page run's snapshots
+total several megabytes and this endpoint is polled while the run is in progress. Fetch one with
+`GET /runs/:id/pages/:pageId`.
+
+`summary.pagesFailed` matters more than it looks: a run can report every test green while a
+quarter of the app was never opened. Surface it.
+
+**Page statuses**
+
+| Status | Meaning |
+|---|---|
+| `DISCOVERED` | found by the crawler, not read yet |
+| `SCANNING` | Chrome is on this page now |
+| `SCANNED` | snapshot captured, awaiting its plan |
+| `PLANNED` | test cases proposed for this page |
+| `SCAN_FAILED` | unreachable, blocked, or rendered nothing — **no tests exist for it** |
+| `PLAN_FAILED` | read, but the model or the policy engine produced nothing |
+| `SKIPPED` | over the run-wide case budget, or excluded by the user |
+
+**Rejection stages** include `CRAWL_SKIPPED` — a link the crawler deliberately did not follow.
+Not a rejected test step, but the same question: what was left out, and why.
+
+### `GET /runs/:id/pages/:pageId`
+
+One page of a run, with the snapshot the AI was shown for it plus that page's advisory lists.
+Separate from `GET /runs/:id` for payload-size reasons only.
+
+```json
+{
+  "id": "…",
+  "url": "https://staging.example.com/settings",
+  "path": "/settings",
+  "status": "PLANNED",
+  "pageSnapshot": { "title": "Settings", "elements": [], "forms": [], "headings": [] },
+  "contentIssues": [{ "id": "…", "kind": "TYPO", "text": "Contnue", "suggestion": "Continue" }],
+  "designIssues": [],
+  "testCases": [{ "id": "…", "title": "…", "priority": "P2" }]
+}
+```
+
+`404` if the page does not belong to that run.
+
 **Run statuses**
 
 | Status | Meaning | Poll? |
 |---|---|---|
 | `CREATED` | queued | yes |
-| `SCANNING` | Playwright is reading the page | yes |
-| `SCAN_FAILED` | page unreachable, blocked, or empty | no |
+| `SCANNING` | Playwright is finding the app's pages, then reading them | yes |
+| `SCAN_FAILED` | **no** page could be read. One unreadable page among many does not do this — it fails that `RunPage` only | no |
 | `PLANNING` | the LLM is writing test cases | yes |
-| `PLAN_FAILED` | LLM error, or everything rejected by policy | no |
+| `PLAN_FAILED` | no page produced a single accepted case | no |
 | `AWAITING_APPROVAL` | needs a human | no |
 | `RUNNING` | executing approved cases | yes |
 | `COMPLETED` | finished (may still contain failures) | no |
@@ -143,7 +251,14 @@ Runs every approved, non-rejected case. `400` if none are approved, or if the ru
 
 ### `POST /runs/:id/replan`
 
-Deletes the AI-authored cases and rejections, re-scans, and asks the model again. Manual cases are kept.
+Deletes the AI-authored cases, the rejections and the un-promoted advisory rows, re-scans **every
+page of the run**, and asks the model again. Manual cases are kept, and so are advisory rows a
+human already promoted into a bug — deleting one would leave a `BUG-00n` pointing at nothing.
+
+**The set of pages is kept**, deliberately: re-crawling would spend another minute rediscovering
+the same URLs, and a nav bar that changed in the meantime would quietly change what the run
+covers — so "re-plan" would stop meaning "plan the same thing again". Create a new run to pick up
+new pages.
 
 ---
 

@@ -50,6 +50,14 @@ export class CreateTicketDto {
   @IsUUID()
   assigneeId?: string;
 
+  /**
+   * Comma-separated, e.g. "ui, regression".
+   *
+   * Still a string on the wire even though the column is now a real array,
+   * because that is what the user types into one text field. The service splits
+   * it - putting the parsing here rather than in the client keeps a hand-made
+   * API call and the UI producing identical rows.
+   */
   @IsOptional()
   @IsString()
   @Length(0, 200)

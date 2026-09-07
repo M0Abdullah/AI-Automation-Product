@@ -71,13 +71,22 @@ export class DesignIssuesController {
   ) {
     const issue = await this.prisma.designIssue.findUnique({
       where: { id },
-      include: { finding: true },
+      // At most one, but a list in the schema - see schema.prisma.
+      include: { findings: { take: 1 } },
     });
     if (!issue) throw new NotFoundException(`Design issue ${id} not found`);
 
     // Idempotent: two clicks must not mint two BUG ids for one deviation.
-    if (issue.finding) {
-      return { findingId: issue.finding.id, bugKey: issue.finding.bugKey, alreadyExisted: true };
+    // Idempotent, and now the ONLY thing enforcing it: the unique index on
+    // Finding.designIssueId had to go because it rejected every finding that
+    // has no design issue. See the optional-unique note in schema.prisma.
+    const promotedAlready = issue.findings[0];
+    if (promotedAlready) {
+      return {
+        findingId: promotedAlready.id,
+        bugKey: promotedAlready.bugKey,
+        alreadyExisted: true,
+      };
     }
     if (issue.status === 'DISMISSED') {
       throw new BadRequestException(

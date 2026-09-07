@@ -1,30 +1,69 @@
-# NOT NEEDED FOR THE MVP — the MVP runs on SQLite (backend/prisma/dev.db).
+# THE DATABASE. Start this before the backend.
 #
-# This file is the upgrade path: when the MVP is approved and the project moves
-# to PostgreSQL, start this and follow "Moving to PostgreSQL" in the README.
-#
-# Starts ONLY the database. Backend + frontend run with npm on your machine.
 #   docker compose up -d
 #   docker compose down          (stop, keep data)
 #   docker compose down -v       (stop, delete data)
+#
+# Starts ONLY MongoDB. Backend + frontend run with npm on your machine.
+#
+# WHY --replSet ON A SINGLE NODE: MongoDB only offers multi-document
+# transactions, change streams and `findAndModify` retries on a replica set, and
+# Prisma's interactive transactions require one. A single-node replica set gives
+# all of that with none of the operational cost of real replication - it is the
+# standard way to run Mongo for development. The one-shot `mongo-init` service
+# below performs the initiation, because a fresh --replSet node refuses writes
+# until it has been told it is a replica set.
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: aitest-postgres
+  mongo:
+    image: mongo:7
+    container_name: aitest-mongo
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: aitest
-      POSTGRES_PASSWORD: aitest
-      POSTGRES_DB: aitest
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
     ports:
-      - '5432:5432'
+      - '27017:27017'
     volumes:
-      - aitest-pgdata:/var/lib/postgresql/data
+      - aitest-mongodata:/data/db
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U aitest -d aitest']
+      # Reports healthy only once the replica set has a PRIMARY, so the backend
+      # is not started against a node that would reject every write.
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { db.hello().isWritablePrimary ? quit(0) : quit(1) } catch(e) { quit(1) }",
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 10s
+
+  # Runs once, then exits. Idempotent: initiating an already-initiated set is a
+  # no-op, so `docker compose up` on an existing volume is safe.
+  mongo-init:
+    image: mongo:7
+    container_name: aitest-mongo-init
+    depends_on:
+      - mongo
+    restart: 'no'
+    entrypoint:
+      - bash
+      - -c
+      - |
+        for i in $$(seq 1 30); do
+          mongosh --host mongo:27017 --quiet --eval 'quit(0)' && break
+          sleep 2
+        done
+        mongosh --host mongo:27017 --quiet --eval '
+          try {
+            rs.status();
+            print("Replica set already initiated.");
+          } catch (e) {
+            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:27017" }] });
+            print("Replica set rs0 initiated.");
+          }
+        '
 
 volumes:
-  aitest-pgdata:
+  aitest-mongodata:

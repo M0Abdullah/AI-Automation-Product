@@ -38,9 +38,19 @@ export function RunForm() {
   // Sign-in URL. When set, the platform logs in once BEFORE scanning and reuses
   // that session for every test - the only way to test a page behind a login.
   const [loginUrl, setLoginUrl] = useState('');
+  // WHOLE-APP SCOPE. Off by default: "test this page" is what most people mean
+  // when they paste a URL, and a crawl nobody asked for spends their LLM quota.
+  // Ticking it turns one page into the whole product.
+  const [wholeApp, setWholeApp] = useState(false);
+  const [maxPages, setMaxPages] = useState(10);
+  const [maxDepth, setMaxDepth] = useState(2);
+  const [excludePaths, setExcludePaths] = useState('');
   // Figma design to check the page against. One paste of the Figma URL fills
   // both - the backend pulls the file key and node id out of it.
   const [figmaUrl, setFigmaUrl] = useState('');
+  // Which page the frame describes. Only asked for in whole-app mode: on a
+  // single-page run there is exactly one candidate, so asking would be noise.
+  const [designPageUrl, setDesignPageUrl] = useState('');
   const [showFigma, setShowFigma] = useState(false);
 
   const [options, setOptions] = useState<CheckOption[]>([]);
@@ -84,6 +94,19 @@ export function RunForm() {
         // a needless way to get a support ticket.
         figmaFileKey: figmaUrl.trim() || undefined,
         figmaNodeId: figmaUrl.trim() || undefined,
+        // Blank means "the entry URL", which the backend already defaults to.
+        designPageUrl: designPageUrl.trim() || undefined,
+        // Whole-app scope. The numbers are sent only when the crawl is on, so a
+        // single-page run cannot be affected by a value left behind in the form.
+        crawlEnabled: wholeApp,
+        maxPages: wholeApp ? maxPages : undefined,
+        maxDepth: wholeApp ? maxDepth : undefined,
+        excludePaths: wholeApp
+          ? excludePaths
+              .split(',')
+              .map((p) => p.trim())
+              .filter(Boolean)
+          : undefined,
         credentials: hasCredentials
           ? { email: email.trim() || undefined, password: password || undefined }
           : undefined,
@@ -114,22 +137,91 @@ export function RunForm() {
         </div>
       )}
 
-      {/* ------------------------------------------------------- 1. the URL */}
+      {/* ---------------------------------------------------- 1. what to test */}
       <div className="card composer-url">
         <div className="step-head">
           <span className="step-num">1</span>
           <div>
-            <h2>Which page?</h2>
-            <span className="faint">A staging or local page you are allowed to test.</span>
+            <h2>{wholeApp ? 'Which app?' : 'Which page?'}</h2>
+            <span className="faint">
+              {wholeApp
+                ? 'The front door of a staging or local app you are allowed to test.'
+                : 'A staging or local page you are allowed to test.'}
+            </span>
           </div>
         </div>
         <input
           type="url"
           required
-          placeholder="https://staging.yoursite.com/login"
+          placeholder={
+            wholeApp ? 'https://staging.yoursite.com' : 'https://staging.yoursite.com/login'
+          }
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
+
+        {/* THE SCOPE SWITCH. One page, or the product. */}
+        <label className="check-row" style={{ marginTop: 12 }}>
+          <input
+            type="checkbox"
+            checked={wholeApp}
+            onChange={(e) => setWholeApp(e.target.checked)}
+          />
+          <span>
+            <strong>Test the whole app, not just this page</strong>
+            <span className="faint" style={{ display: 'block' }}>
+              We follow the links from this page to find your app&apos;s screens, then run
+              every check you tick on all of them &mdash; one run, one approval, one bug
+              list. External links, sign-out and anything destructive are never followed.
+            </span>
+          </span>
+        </label>
+
+        {wholeApp && (
+          <div className="crawl-scope">
+            <label className="field">
+              <span className="field-label">Maximum pages</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={maxPages}
+                onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
+              />
+              <span className="field-hint">
+                Each page costs one browser scan and one AI call, so this is the dial that
+                decides how long the run takes. Start at 10.
+              </span>
+            </label>
+
+            <label className="field">
+              <span className="field-label">How deep to follow links</span>
+              <select value={maxDepth} onChange={(e) => setMaxDepth(Number(e.target.value))}>
+                <option value={1}>1 &mdash; only pages linked from the entry page</option>
+                <option value={2}>2 &mdash; and the pages those link to</option>
+                <option value={3}>3 &mdash; three clicks deep</option>
+              </select>
+              <span className="field-hint">
+                Pages are found nearest-first, so a small page budget is spent on the
+                screens a user actually reaches.
+              </span>
+            </label>
+
+            <label className="field" style={{ marginBottom: 0 }}>
+              <span className="field-label">Skip anything containing (optional)</span>
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder="/admin, /billing, ?preview="
+                value={excludePaths}
+                onChange={(e) => setExcludePaths(e.target.value)}
+              />
+              <span className="field-hint">
+                Comma-separated. Use it for areas you do not want an automated browser in.
+              </span>
+            </label>
+          </div>
+        )}
       </div>
 
       {/* --------------------------------------------------- 2. the checklist */}
@@ -279,7 +371,8 @@ export function RunForm() {
           <div>
             <h2>Match against Figma</h2>
             <span className="faint">
-              Optional. Checks the page against your design&apos;s sizes, radii, type and fonts.
+              Optional. Checks one page against your design&apos;s sizes, colours, type,
+              icons and spacing.
             </span>
           </div>
           <button
@@ -305,15 +398,41 @@ export function RunForm() {
             <span className="field-hint">
               Open the frame in Figma and copy the address bar &mdash; it needs the{' '}
               <code>node-id</code> on the end, so we read that frame and not the whole file.
-              We read the design&apos;s button heights, corner radii, type scale and fonts,
-              then flag anything on the page that is a pixel or two off. Findings are
-              suggestions, never automatic bugs.
+              We read the design&apos;s button and input heights, corner radii, type scale,
+              weights, text and surface colours, icon sizes and spacing scale, then flag
+              anything on the page that is a hair off. Findings are suggestions, never
+              automatic bugs.
             </span>
           </label>
         ) : (
           <span className="faint">
             {figmaUrl.trim() ? 'Design comparison is on for this run.' : 'No design comparison.'}
           </span>
+        )}
+
+        {/*
+          WHICH page the frame describes.
+          Only asked in whole-app mode: a Figma frame is one screen's design, so
+          the comparison stays single-page however many pages the run tests.
+          Checking a settings page against a login frame would report every
+          button on it as wrong - a wall of confident, wrong findings.
+        */}
+        {showFigma && wholeApp && (
+          <label className="field" style={{ marginTop: 12, marginBottom: 0 }}>
+            <span className="field-label">Which page is this design for?</span>
+            <input
+              type="url"
+              autoComplete="off"
+              placeholder={url.trim() || 'https://staging.yoursite.com/login'}
+              value={designPageUrl}
+              onChange={(e) => setDesignPageUrl(e.target.value)}
+            />
+            <span className="field-hint">
+              Leave blank to use the entry page. Every other check still runs on all the
+              pages we find &mdash; only the design comparison is limited to this one,
+              because a Figma frame is one screen&apos;s design.
+            </span>
+          </label>
         )}
       </div>
 

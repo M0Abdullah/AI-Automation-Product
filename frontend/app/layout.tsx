@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '../components/AppShell';
@@ -25,6 +25,19 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'AI Testing Platform',
   description: 'Requirements in, reviewed browser tests out.',
+};
+
+/**
+ * themeColor paints the browser's own chrome — the Android address bar, the
+ * Safari title area. Without it the OS picks white, which puts a bright band
+ * directly above a near-black app. The two values match --bg in each theme.
+ */
+export const viewport: Viewport = {
+  colorScheme: 'dark light',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#08090a' },
+    { media: '(prefers-color-scheme: light)', color: '#f4f5f3' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

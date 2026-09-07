@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { IntegrationsPanel } from '../../components/IntegrationsPanel';
 import { useAuth } from '../../components/AuthProvider';
 import { getLoginHistory, getTeam } from '../../lib/api';
 import { ROLE_LABEL } from '../../lib/auth';
@@ -97,6 +98,8 @@ export default function AccountPage() {
         </div>
       </div>
 
+      <IntegrationsPanel />
+
       <div className="card">
         <div className="card-head">
           <div>
@@ -128,7 +131,7 @@ export default function AccountPage() {
                   <td className="faint">{new Date(s.expiresAt).toLocaleDateString()}</td>
                   <td>
                     {s.revokedAt ? (
-                      <span className="badge badge-neutral">revoked</span>
+                      <span className="badge badge-neutral badge-plain">revoked</span>
                     ) : (
                       <span className="badge badge-pass">active</span>
                     )}

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { packJson, unpackJson } from '../common/db-json';
 import { CaseSource } from '../common/enums';
-import { hydrateResult, hydrateTestCase } from '../common/hydrate';
+import { readJson, writeJson } from '../common/json';
 import type { TestAssertion, TestCasePlan, TestStep } from '../common/test-plan.types';
 import { PolicyService } from '../policy/policy.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -30,12 +29,18 @@ export class TestCasesService {
         run: { select: { id: true, targetUrl: true, allowDestructive: true } },
         results: {
           orderBy: { startedAt: 'asc' },
-          include: { consoleLogs: true, networkLogs: true, finding: true },
+          // findings, not finding: see schema.prisma. Collapsed below so the
+          // response shape does not change.
+          include: { consoleLogs: true, networkLogs: true, findings: { take: 1 } },
         },
       },
     });
     if (!tc) throw new NotFoundException(`Test case ${id} not found`);
-    return hydrateTestCase(tc as unknown as Record<string, unknown>);
+
+    return {
+      ...tc,
+      results: tc.results.map(({ findings, ...r }) => ({ ...r, finding: findings[0] ?? null })),
+    };
   }
 
   async update(id: string, dto: UpdateTestCaseDto) {
@@ -45,9 +50,9 @@ export class TestCasesService {
     });
     if (!existing) throw new NotFoundException(`Test case ${id} not found`);
 
-    const steps = (dto.steps ?? unpackJson<TestStep[]>(existing.steps, [])) as TestStep[];
+    const steps = (dto.steps ?? readJson<TestStep[]>(existing.steps, [])) as TestStep[];
     const assertions = (dto.assertions ??
-      unpackJson<TestAssertion[]>(existing.assertions, [])) as TestAssertion[];
+      readJson<TestAssertion[]>(existing.assertions, [])) as TestAssertion[];
 
     // Re-run the policy check on the edited version.
     const candidate: TestCasePlan = {
@@ -58,9 +63,13 @@ export class TestCasesService {
       destructive: existing.destructive,
     };
 
+    // Validated against the case's OWN page, not the run's entry URL. Same
+    // origin either way, so the navigation rule is unchanged - but on a
+    // whole-app run the entry URL is not where this case runs, and passing it
+    // would make the error messages point at the wrong page.
     const { accepted, rejections } = this.policy.review(
       [candidate],
-      existing.run.targetUrl,
+      existing.pageUrl ?? existing.run.targetUrl,
       existing.run.allowDestructive,
     );
 
@@ -79,8 +88,8 @@ export class TestCasesService {
         title: candidate.title,
         priority: candidate.priority,
         requirement: dto.requirement ?? existing.requirement,
-        steps: packJson(steps),
-        assertions: packJson(assertions),
+        steps: writeJson(steps),
+        assertions: writeJson(assertions),
         // Any structural edit marks the case as human-authored, which is what
         // makes "percentage of AI tests approved without edits" measurable.
         source: edited ? CaseSource.MANUAL : existing.source,
@@ -90,7 +99,7 @@ export class TestCasesService {
       },
     });
 
-    return hydrateTestCase(saved as unknown as Record<string, unknown>);
+    return saved;
   }
 
   async approve(id: string) {
@@ -98,7 +107,7 @@ export class TestCasesService {
       where: { id },
       data: { approved: true, approvedAt: new Date(), rejected: false, rejectionReason: null },
     });
-    return hydrateTestCase(saved as unknown as Record<string, unknown>);
+    return saved;
   }
 
   async reject(id: string, dto: RejectTestCaseDto) {
@@ -110,7 +119,7 @@ export class TestCasesService {
         rejectionReason: dto.reason?.trim() || 'Rejected by QA during review',
       },
     });
-    return hydrateTestCase(saved as unknown as Record<string, unknown>);
+    return saved;
   }
 
   /** Bulk approve - the common case when the plan looks right. */
@@ -143,9 +152,6 @@ export class TestCasesService {
       include: { consoleLogs: true, networkLogs: true },
     });
 
-    return {
-      retested: true,
-      result: latest ? hydrateResult(latest as unknown as Record<string, unknown>) : null,
-    };
+    return { retested: true, result: latest };
   }
 }
