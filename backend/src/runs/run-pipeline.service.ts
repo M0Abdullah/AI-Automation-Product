@@ -117,6 +117,12 @@ export class RunPipelineService {
     const pages = await this.discoverPages(run, storageState);
     if (!pages.length) return; // discoverPages already failed the run
 
+    // Told now rather than on the button press: this is the first moment we can
+    // say something the user does not already know - how many pages there are,
+    // and therefore roughly how long this will take. That is what makes it safe
+    // for them to close the tab.
+    this.notifyRunStarted(run, pages.length, Boolean(storageState));
+
     // Design comparison, fire-and-forget: it needs only a URL, it cannot change
     // the plan, and making the user wait on the Figma API before seeing their
     // test cases would be a poor trade. Started here so it overlaps the scans.
@@ -363,6 +369,20 @@ export class RunPipelineService {
         llmTokensOut: llmMeta.tokensOut || null,
         llmLatencyMs: llmMeta.latencyMs || null,
       },
+    });
+
+    // IT IS THE USER'S TURN, AND THEY HAVE TO BE TOLD.
+    //
+    // The pipeline stops dead here by design - nothing opens a browser against
+    // a real site until a human approves the plan. The cost of that gate is
+    // that a run nobody is notified about sits in AWAITING_APPROVAL forever,
+    // while the user believes the tool is still working. This email is the
+    // whole reason the gate does not become a black hole.
+    this.notifyTestsReady({
+      runId,
+      totalAccepted,
+      pagesPlanned: scannedPages,
+      totalPages: pages.length,
     });
 
     this.logger.log(
@@ -720,6 +740,87 @@ export class RunPipelineService {
     // Told AFTER the status flips, so the link in the email opens a finished
     // run rather than one that still says "running".
     this.notifyRunFinished(runId);
+  }
+
+  /**
+   * "We have started, and here is how big the job is."
+   *
+   * Fire-and-forget like every other notification: a mail outage must never
+   * stop a run from being planned.
+   */
+  private notifyRunStarted(
+    run: { id: string; name: string; targetUrl: string; crawlEnabled: boolean; createdById: string | null },
+    pageCount: number,
+    signedIn: boolean,
+  ): void {
+    if (!this.config.mail.onRunStarted || !run.createdById) return;
+
+    void (async () => {
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: run.createdById as string },
+          select: { name: true, email: true },
+        });
+        if (!user?.email) return;
+
+        await this.mail.sendRunStarted({
+          to: user.email,
+          name: user.name,
+          runId: run.id,
+          runName: run.name,
+          targetUrl: run.targetUrl,
+          wholeApp: run.crawlEnabled,
+          pageCount,
+          signedIn,
+        });
+      } catch (err) {
+        this.logger.warn(`Could not send the run-started email for ${run.id}: ${String(err)}`);
+      }
+    })();
+  }
+
+  /**
+   * "N tests are waiting for your approval."
+   *
+   * The one notification the product cannot do without - see the call site.
+   */
+  private notifyTestsReady(input: {
+    runId: string;
+    totalAccepted: number;
+    pagesPlanned: number;
+    totalPages: number;
+  }): void {
+    if (!this.config.mail.onTestsReady) return;
+
+    void (async () => {
+      try {
+        const run = await this.prisma.run.findUnique({
+          where: { id: input.runId },
+          include: {
+            createdBy: { select: { name: true, email: true } },
+            pages: { select: { status: true } },
+          },
+        });
+        if (!run?.createdBy?.email) return;
+
+        await this.mail.sendTestsReady({
+          to: run.createdBy.email,
+          name: run.createdBy.name,
+          runId: run.id,
+          runName: run.name,
+          targetUrl: run.targetUrl,
+          caseCount: input.totalAccepted,
+          pagesPlanned: input.pagesPlanned,
+          pagesFailed: run.pages.filter(
+            (p) =>
+              p.status === RunPageStatus.SCAN_FAILED || p.status === RunPageStatus.PLAN_FAILED,
+          ).length,
+          totalPages: input.totalPages,
+        });
+      } catch (err) {
+        this.logger.warn(`Could not send the tests-ready email for ${input.runId}: ${String(err)}`);
+      }
+    })();
   }
 
   /**

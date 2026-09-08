@@ -188,6 +188,11 @@ export const envSchema = z.object({
   // Which notifications to send. Separate switches because they have very
   // different audiences: a sign-in alert is security, a run summary is work.
   MAIL_ON_LOGIN: bool(true),
+  // "We have started, N pages found." Sent after discovery, not on the click.
+  MAIL_ON_RUN_STARTED: bool(true),
+  // "N tests are waiting for you." The run PAUSES here, so this one matters
+  // most - without it a run can sit unapproved indefinitely.
+  MAIL_ON_TESTS_READY: bool(true),
   MAIL_ON_RUN_FINISHED: bool(true),
   MAIL_ON_BUG_FILED: bool(true),
 });

@@ -154,6 +154,120 @@ export class MailService implements OnModuleInit {
   // =========================================================== run events
 
   /**
+   * WORK HAS STARTED — sent once the pages are known.
+   *
+   * Deliberately NOT sent the instant the button is pressed: at that moment the
+   * user is looking at the screen and an email tells them nothing they cannot
+   * see. It is sent after page discovery, because that is the first moment it
+   * can say something they do NOT know — how many pages were found and roughly
+   * how long this will take. That is what makes it safe to close the tab.
+   */
+  async sendRunStarted(input: {
+    to: string;
+    name: string;
+    runId: string;
+    runName: string;
+    targetUrl: string;
+    wholeApp: boolean;
+    pageCount: number;
+    signedIn: boolean;
+  }): Promise<boolean> {
+    const rows: Row[] = [
+      { label: 'Target', value: input.targetUrl },
+      { label: 'Scope', value: input.wholeApp ? 'The whole app' : 'This page only' },
+      { label: 'Pages found', value: String(input.pageCount) },
+      { label: 'Signed in first', value: input.signedIn ? 'Yes' : 'No — tested as a visitor' },
+    ];
+
+    const body = layout({
+      preheader: `Testing ${input.pageCount} page(s) on ${hostOf(input.targetUrl)} — we will email you when the tests are ready to review.`,
+      heading: `Testing has started on ${hostOf(input.targetUrl)}`,
+      intro:
+        `Hello ${input.name}, we are reading ${
+          input.pageCount === 1 ? 'your page' : `all ${input.pageCount} pages`
+        } in real Chrome and writing test cases for ${input.pageCount === 1 ? 'it' : 'each of them'}. ` +
+        'You can close the tab — the next email will tell you when there is something to review.',
+      rows,
+      cta: { label: 'Watch it live', url: this.appUrl(`/runs/${input.runId}`) },
+      footnote:
+        input.pageCount > 4
+          ? 'This takes roughly a minute per page: one browser scan plus one AI call for each.'
+          : 'This usually takes under a minute.',
+    });
+
+    return this.send(
+      input.to,
+      `Testing started — ${input.runName}`,
+      body.html,
+      body.text,
+    );
+  }
+
+  /**
+   * TESTS ARE READY FOR YOUR APPROVAL.
+   *
+   * THE MOST IMPORTANT NOTIFICATION IN THE PRODUCT, and the one that was
+   * missing. The pipeline deliberately stops here: nothing touches a browser
+   * until a human approves the plan. That gate is the platform's whole safety
+   * argument — and it also means a run that nobody is told about sits in
+   * AWAITING_APPROVAL forever. The user closes the tab believing the tool is
+   * working, and it is waiting on them.
+   *
+   * So this email exists to say one thing clearly: it is your turn.
+   */
+  async sendTestsReady(input: {
+    to: string;
+    name: string;
+    runId: string;
+    runName: string;
+    targetUrl: string;
+    caseCount: number;
+    pagesPlanned: number;
+    pagesFailed: number;
+    totalPages: number;
+  }): Promise<boolean> {
+    const rows: Row[] = [
+      { label: 'Target', value: input.targetUrl },
+      { label: 'Tests proposed', value: String(input.caseCount) },
+      ...(input.totalPages > 1
+        ? [{ label: 'Pages covered', value: `${input.pagesPlanned} of ${input.totalPages}` }]
+        : []),
+    ];
+
+    const callouts = [
+      'Nothing has run yet, and nothing will until you approve it. That is deliberate — the ' +
+        'tests open a real browser against your site.',
+    ];
+    if (input.pagesFailed > 0) {
+      callouts.push(
+        `${input.pagesFailed} page${input.pagesFailed === 1 ? '' : 's'} could not be read, so ` +
+          `no tests exist for ${input.pagesFailed === 1 ? 'it' : 'them'}. The run page gives the reason for each.`,
+      );
+    }
+
+    const body = layout({
+      preheader: `${input.caseCount} test(s) are waiting for your approval on ${hostOf(input.targetUrl)}.`,
+      heading: `${input.caseCount} test${input.caseCount === 1 ? '' : 's'} ready for your review`,
+      intro:
+        `Hello ${input.name}, the AI has finished writing test cases for “${input.runName}”. ` +
+        'Read them, edit anything that looks wrong, then approve — that is when they actually run.',
+      rows,
+      callouts,
+      cta: { label: 'Review and approve', url: this.appUrl(`/runs/${input.runId}`) },
+      footnote:
+        'Each test lists its steps and the exact assertions that decide pass or fail, so you can ' +
+        'see what it will do before it does it.',
+    });
+
+    return this.send(
+      input.to,
+      `Action needed: ${input.caseCount} test${input.caseCount === 1 ? '' : 's'} to approve — ${input.runName}`,
+      body.html,
+      body.text,
+    );
+  }
+
+  /**
    * RUN FINISHED — the summary of what was tested and what broke.
    *
    * This is the "tell me when my audit is done" email. It leads with the counts
@@ -302,7 +416,15 @@ export class MailService implements OnModuleInit {
         're-run against your fix.',
     });
 
-    return this.send(input.to, `${input.bugKey}: ${input.title}`.slice(0, 180), body.html, body.text);
+    // The ticket title is created as "BUG-005: <test name>", so prefixing the
+    // key again produced "BUG-005: BUG-005: ...". Only prefix when it is not
+    // already there - the key still has to lead the subject line, because that
+    // is what makes the bug findable in a mail client.
+    const subject = input.title.startsWith(input.bugKey)
+      ? input.title
+      : `${input.bugKey}: ${input.title}`;
+
+    return this.send(input.to, subject.slice(0, 180), body.html, body.text);
   }
 }
 

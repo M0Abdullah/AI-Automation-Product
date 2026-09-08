@@ -168,6 +168,8 @@ export class AppConfigService {
       timeoutMs: this.get('MAIL_TIMEOUT_MS'),
       appUrl: this.get('APP_PUBLIC_URL'),
       onLogin: this.get('MAIL_ON_LOGIN'),
+      onRunStarted: this.get('MAIL_ON_RUN_STARTED'),
+      onTestsReady: this.get('MAIL_ON_TESTS_READY'),
       onRunFinished: this.get('MAIL_ON_RUN_FINISHED'),
       onBugFiled: this.get('MAIL_ON_BUG_FILED'),
     };
