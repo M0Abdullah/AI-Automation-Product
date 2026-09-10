@@ -12,6 +12,8 @@ import type {
   RunListItem,
   RunPageDetail,
   IntegrationStatus,
+  TicketDestination,
+  TrackerName,
   TrackerStatus,
   TeamMember,
   TestCase,
@@ -357,6 +359,12 @@ export const commentOnFinding = (id: string, note: string) =>
 export const createTicket = (
   findingId: string,
   body: {
+    /**
+     * WHERE THE BUG GOES. 'jira' | 'clickup' | 'linear' files it in that
+     * tracker in the same request; 'local' keeps it in this tool only.
+     * Omitted = the instance default.
+     */
+    provider?: TicketDestination;
     title?: string;
     priority?: string;
     severity?: string;
@@ -413,10 +421,11 @@ export const verifyMail = () =>
   request<{ ok: boolean; detail: string }>('/integrations/mail/verify', { method: 'POST' });
 
 /** Checks the tracker credentials. Does NOT file a test issue. */
-export const verifyTracker = () =>
-  request<{ ok: boolean; provider: string; detail: string }>('/trackers/verify', {
-    method: 'POST',
-  });
+export const verifyTracker = (provider?: TrackerName) =>
+  request<{ ok: boolean; provider: string; detail: string }>(
+    `/trackers/verify${provider ? `?provider=${provider}` : ''}`,
+    { method: 'POST' },
+  );
 
 /**
  * File this ticket in the configured tracker, or retry a failed push.
@@ -424,9 +433,9 @@ export const verifyTracker = () =>
  * Idempotent server-side: a ticket already filed returns its existing issue
  * rather than creating a second one.
  */
-export const pushTicket = (id: string) =>
+export const pushTicket = (id: string, provider?: TrackerName) =>
   request<{ ok: boolean; detail: string; key?: string; url?: string; warnings?: string[] }>(
-    `/tickets/${id}/push`,
+    `/tickets/${id}/push${provider ? `?provider=${provider}` : ''}`,
     { method: 'POST' },
   );
 

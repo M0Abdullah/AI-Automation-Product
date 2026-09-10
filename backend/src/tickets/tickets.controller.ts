@@ -86,8 +86,14 @@ export class TicketsController {
    */
   @RequireWrite()
   @Post('tickets/:id/push')
-  push(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.tickets.pushToTracker(id, user);
+  push(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+    @Query('provider') provider?: string,
+  ) {
+    return this.tickets.pushToTracker(id, user, {
+      provider: isProviderName(provider) ? provider : undefined,
+    });
   }
 
   /** GET /api/trackers/status — which tracker is configured, if any. */
@@ -104,8 +110,8 @@ export class TicketsController {
    */
   @RequireWrite()
   @Post('trackers/verify')
-  verifyTracker() {
-    return this.tickets.verifyTracker();
+  verifyTracker(@Query('provider') provider?: string) {
+    return this.tickets.verifyTracker(isProviderName(provider) ? provider : undefined);
   }
 
   @Post('tickets/:id/external')
@@ -116,4 +122,9 @@ export class TicketsController {
   ) {
     return this.tickets.linkExternal(id, dto, user);
   }
+}
+
+/** Narrows a query string to a tracker name, so a typo cannot reach a provider. */
+function isProviderName(v?: string): v is 'jira' | 'clickup' | 'linear' {
+  return v === 'jira' || v === 'clickup' || v === 'linear';
 }

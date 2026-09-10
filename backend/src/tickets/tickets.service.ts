@@ -6,6 +6,7 @@ import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReportsService } from '../reports/reports.service';
 import { TrackerService, describeError } from '../trackers/tracker.service';
+import type { TrackerProviderName } from '../trackers/tracker.types';
 import { RunPipelineService } from '../runs/run-pipeline.service';
 import type { JwtPayload } from '../auth/auth.service';
 import {
@@ -130,14 +131,27 @@ export class TicketsService {
     this.logger.log(`${ticketKey} created from ${bugKey} by ${actor.email}`);
 
     // ------------------------------------------------- file it, and say so
+    //
     // Awaited, unlike the email. A ticket whose whole purpose is to appear in
-    // Jira should not return "created" to the UI before we know whether it
-    // did - the user would close the dialog believing it was filed. The push
-    // records its own failure on the ticket, so an error here never loses the
-    // local ticket.
+    // Jira must not return "created" to the UI before we know whether it did -
+    // the user would close the dialog believing it was filed. The push records
+    // its own failure on the ticket, so an error here never loses the local
+    // record.
+    //
+    // WHEN: the user named a destination, or the instance is set to auto-push.
+    // 'local' is the explicit opt-out - the one case where a confirmed bug
+    // stays inside this tool on purpose.
+    const wantsExternal = dto.provider && dto.provider !== 'local';
     let pushed: Awaited<ReturnType<typeof this.pushToTracker>> | null = null;
-    if (this.trackers.autoPushEnabled) {
-      pushed = await this.pushToTracker(ticket.id, actor, { silentIfUnconfigured: true });
+
+    if (wantsExternal || (!dto.provider && this.trackers.autoPushEnabled)) {
+      pushed = await this.pushToTracker(ticket.id, actor, {
+        provider: wantsExternal ? (dto.provider as TrackerProviderName) : undefined,
+        // A destination the user CHOSE must report its failure loudly. An
+        // automatic push on an unconfigured instance stays quiet, because that
+        // is a deployment choice and not something this user did wrong.
+        silentIfUnconfigured: !wantsExternal,
+      });
     }
 
     this.notifyBugFiled(ticket.id, actor);
@@ -161,7 +175,11 @@ export class TicketsService {
   async pushToTracker(
     id: string,
     actor: JwtPayload,
-    options: { silentIfUnconfigured?: boolean } = {},
+    options: {
+      silentIfUnconfigured?: boolean;
+      /** Which tracker. Omitted = the instance default. */
+      provider?: TrackerProviderName;
+    } = {},
   ): Promise<{ ok: boolean; detail: string; key?: string; url?: string; warnings?: string[] }> {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id },
@@ -195,9 +213,8 @@ export class TicketsService {
     const status = this.trackers.status();
     if (!status.enabled) {
       const detail =
-        status.provider === 'none'
-          ? 'No issue tracker is configured. Set TRACKER_PROVIDER in backend/.env to jira, clickup or linear.'
-          : `${status.provider} is selected but missing: ${status.missingConfig.join(', ')}.`;
+        'No issue tracker is configured. Add Jira, ClickUp or Linear credentials to ' +
+        'backend/.env and restart — any number of them can be set up at once.';
       // On auto-push we stay quiet: an unconfigured tracker is a deployment
       // choice, not an error the person creating a ticket caused.
       if (options.silentIfUnconfigured) {
@@ -211,10 +228,14 @@ export class TicketsService {
 
     // The idempotency key is claimed first. Two concurrent pushes race here,
     // and the loser sees a row that already has one.
-    const requestId = `${ticket.id}:${status.provider}`;
+    // The destination is part of the idempotency key: re-filing the SAME bug
+    // into a DIFFERENT tracker is a legitimate action (it moved teams), while
+    // filing it twice into the same one is not.
+    const target = options.provider ?? (status.provider as TrackerProviderName);
+    const requestId = `${ticket.id}:${target}`;
     await this.prisma.ticket.update({
       where: { id },
-      data: { externalRequestId: requestId, externalProvider: status.provider },
+      data: { externalRequestId: requestId, externalProvider: target },
     });
 
     const attachments = await this.trackers.collectAttachments({
@@ -224,15 +245,18 @@ export class TicketsService {
     });
 
     try {
-      const issue = await this.trackers.createIssue({
-        title: ticket.title,
-        markdown: ticket.description,
-        priority: ticket.priority,
-        severity: ticket.severity,
-        labels: ticket.labels,
-        attachments,
-        idempotencyKey: requestId,
-      });
+      const issue = await this.trackers.createIssue(
+        {
+          title: ticket.title,
+          markdown: ticket.description,
+          priority: ticket.priority,
+          severity: ticket.severity,
+          labels: ticket.labels,
+          attachments,
+          idempotencyKey: requestId,
+        },
+        options.provider,
+      );
 
       await this.prisma.ticket.update({
         where: { id },
@@ -289,8 +313,8 @@ export class TicketsService {
     return this.trackers.status();
   }
 
-  verifyTracker() {
-    return this.trackers.verify();
+  verifyTracker(provider?: TrackerProviderName) {
+    return this.trackers.verify(provider);
   }
 
   /**

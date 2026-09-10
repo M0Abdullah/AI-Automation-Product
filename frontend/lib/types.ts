@@ -559,15 +559,29 @@ export interface Ticket {
  * `enabled` folds together "a provider is selected" and "it is fully
  * configured", so no component has to re-derive whether a push can work.
  */
+export type TrackerName = 'jira' | 'clickup' | 'linear';
+
+/** Where a confirmed bug can be filed. 'local' keeps it in this tool only. */
+export type TicketDestination = TrackerName | 'local';
+
 export interface TrackerStatus {
   enabled: boolean;
-  provider: 'none' | 'jira' | 'clickup' | 'linear';
+  /** The DEFAULT selection, not the only option. See `providers`. */
+  provider: 'none' | TrackerName;
   /** Human label, e.g. "Jira (acme.atlassian.net, project QA)". */
   describe: string;
   /** True when a confirmed defect is filed automatically, with no extra click. */
   autoPush: boolean;
   /** Env vars still missing. Empty when `enabled`. */
   missingConfig: string[];
+  /**
+   * EVERY tracker that is fully configured — the options to offer the user.
+   * More than one can be set up at once, so the destination is a per-bug
+   * choice rather than a deployment setting.
+   */
+  providers: Array<{ name: TrackerName; describe: string }>;
+  /** The ones that are not set up, and what each is missing. */
+  unconfigured: Array<{ name: TrackerName; missingConfig: string[] }>;
 }
 
 /**

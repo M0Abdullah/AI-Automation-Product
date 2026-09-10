@@ -37,10 +37,16 @@ export class TrackerService {
 
   constructor(private readonly config: AppConfigService) {}
 
-  /** The provider named by TRACKER_PROVIDER, or null when set to `none`. */
-  private provider(): TrackerProvider | null {
+  /**
+   * Build one provider by name, configured or not.
+   *
+   * Every provider is constructible regardless of TRACKER_PROVIDER, because the
+   * UI needs to ask "which of these could I file into?" - and answering that
+   * needs the object, so it can report its own missing config.
+   */
+  private build(name: TrackerProviderName): TrackerProvider {
     const t = this.config.tracker;
-    switch (t.provider) {
+    switch (name) {
       case 'jira':
         return new JiraProvider({
           baseUrl: t.jira.baseUrl,
@@ -63,36 +69,95 @@ export class TrackerService {
           team: t.linear.team,
           timeoutMs: t.timeoutMs,
         });
-      default:
-        return null;
     }
   }
 
-  /** Is a tracker set up at all? Drives whether the UI offers the button. */
+  /**
+   * EVERY tracker that is fully configured, not just the "selected" one.
+   *
+   * This is what makes the destination a choice the user makes when they file a
+   * bug, rather than a deployment setting they cannot see. Fill in Jira AND
+   * ClickUp credentials and both appear as options; the old TRACKER_PROVIDER
+   * now only decides which one is pre-selected.
+   */
+  available(): TrackerProvider[] {
+    return (['jira', 'clickup', 'linear'] as TrackerProviderName[])
+      .map((n) => this.build(n))
+      .filter((p) => p.isConfigured());
+  }
+
+  /**
+   * Which provider a request should go to.
+   *
+   * Explicit choice wins. Otherwise TRACKER_PROVIDER, if that one is actually
+   * configured. Otherwise the only configured one - so a single-tracker setup
+   * never has to name it.
+   */
+  private resolve(requested?: TrackerProviderName | null): TrackerProvider | null {
+    const configured = this.available();
+    if (requested) {
+      return configured.find((p) => p.name === requested) ?? null;
+    }
+    const preferred = this.config.tracker.provider;
+    if (preferred !== 'none') {
+      const match = configured.find((p) => p.name === preferred);
+      if (match) return match;
+    }
+    return configured.length === 1 ? configured[0] : (configured[0] ?? null);
+  }
+
+  /** Kept for the places that only need "is anything set up". */
+  private provider(): TrackerProvider | null {
+    return this.resolve();
+  }
+
+  /**
+   * What the UI needs to render the destination picker.
+   *
+   * `providers` is the list to offer; `provider` is the default selection. Both
+   * are returned because a picker needs the options AND the pre-selected one,
+   * and deriving the second from the first is exactly the sort of logic that
+   * ends up implemented differently in two places.
+   */
   status(): {
     enabled: boolean;
     provider: TrackerProviderName | 'none';
     describe: string;
     autoPush: boolean;
     missingConfig: string[];
+    providers: Array<{ name: TrackerProviderName; describe: string }>;
+    /** Every provider that is NOT configured, and what it is missing. */
+    unconfigured: Array<{ name: TrackerProviderName; missingConfig: string[] }>;
   } {
-    const p = this.provider();
-    if (!p) {
+    const configured = this.available();
+    const providers = configured.map((p) => ({ name: p.name, describe: p.describe() }));
+    const unconfigured = (['jira', 'clickup', 'linear'] as TrackerProviderName[])
+      .map((n) => this.build(n))
+      .filter((p) => !p.isConfigured())
+      .map((p) => ({ name: p.name, missingConfig: p.missingConfig() }));
+
+    const chosen = this.resolve();
+
+    if (!chosen) {
       return {
         enabled: false,
         provider: 'none',
         describe: 'No issue tracker configured',
         autoPush: false,
         missingConfig: ['TRACKER_PROVIDER'],
+        providers,
+        unconfigured,
       };
     }
-    const missing = p.missingConfig();
+
     return {
-      enabled: missing.length === 0,
-      provider: p.name,
-      describe: p.describe(),
-      autoPush: this.config.tracker.autoPush && missing.length === 0,
-      missingConfig: missing,
+      enabled: true,
+      provider: chosen.name,
+      describe: chosen.describe(),
+      autoPush: this.config.tracker.autoPush,
+      missingConfig: [],
+      providers,
+      unconfigured,
     };
   }
 
@@ -108,8 +173,10 @@ export class TrackerService {
    * by filing a throwaway issue into a real backlog would be worse than having
    * no button.
    */
-  async verify(): Promise<{ ok: boolean; provider: string; detail: string }> {
-    const p = this.provider();
+  async verify(
+    name?: TrackerProviderName,
+  ): Promise<{ ok: boolean; provider: string; detail: string }> {
+    const p = name ? this.build(name) : this.provider();
     if (!p) {
       return {
         ok: false,
@@ -141,23 +208,34 @@ export class TrackerService {
    * because the alternative is a confirmed bug that quietly never reached the
    * developers.
    */
-  async createIssue(input: TrackerIssueInput): Promise<TrackerIssue> {
-    const p = this.provider();
+  async createIssue(
+    input: TrackerIssueInput,
+    /** Which tracker to file into. Omitted = the default from status(). */
+    requested?: TrackerProviderName | null,
+  ): Promise<TrackerIssue> {
+    // A requested provider that is not configured must be a clear error, not a
+    // silent fall back to a different tracker - filing a bug into the wrong
+    // team's board is worse than failing.
+    if (requested) {
+      const p = this.build(requested);
+      const missing = p.missingConfig();
+      if (missing.length) {
+        throw new TrackerError(
+          `${requested} is not configured on this instance.`,
+          400,
+          `Add these to backend/.env and restart: ${missing.join(', ')}`,
+          requested,
+        );
+      }
+    }
+
+    const p = this.resolve(requested);
     if (!p) {
       throw new TrackerError(
         'No issue tracker is configured.',
         400,
-        'Set TRACKER_PROVIDER to jira, clickup or linear in backend/.env, with that provider’s credentials.',
+        'Add Jira, ClickUp or Linear credentials to backend/.env and restart. Any number of them can be set up at once.',
         'jira',
-      );
-    }
-    const missing = p.missingConfig();
-    if (missing.length) {
-      throw new TrackerError(
-        `${p.name} is selected but not fully configured.`,
-        400,
-        `Add these to backend/.env: ${missing.join(', ')}`,
-        p.name,
       );
     }
 

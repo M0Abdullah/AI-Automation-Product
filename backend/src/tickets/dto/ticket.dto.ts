@@ -18,6 +18,21 @@ const SEVERITIES = ['S1_BLOCKER', 'S2_MAJOR', 'S3_MINOR', 'S4_TRIVIAL'];
  * the difference between a two-second action and a form nobody fills in.
  */
 export class CreateTicketDto {
+  /**
+   * WHERE THE BUG SHOULD GO.
+   *
+   * 'jira' | 'clickup' | 'linear' files it in that tracker immediately, in the
+   * same request. 'local' keeps it in this tool only. Omitted = whatever the
+   * instance has configured as its default.
+   *
+   * The destination is a per-bug decision, not a deployment setting: a team can
+   * have Jira for the product board and Linear for the platform team, and the
+   * person filing knows which one this defect belongs to.
+   */
+  @IsOptional()
+  @IsIn(['jira', 'clickup', 'linear', 'local'])
+  provider?: 'jira' | 'clickup' | 'linear' | 'local';
+
   @IsOptional()
   @IsString()
   @Length(3, 200)
