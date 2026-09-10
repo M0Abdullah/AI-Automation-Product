@@ -1,0 +1,124 @@
+# CI for a NestJS backend + Next.js frontend in one repo.
+#
+# REPLACES the "NodeJS with Webpack" workflow GitHub suggests by default. That
+# one ran `npm install && npx webpack` at the repository root, where there is no
+# package.json and no webpack — so it failed on every single push and left a red
+# cross on the repo. A permanently-red CI is worse than none: it trains everyone
+# to ignore the signal, and then a real break looks identical.
+#
+# The two apps are built separately because they have separate lockfiles.
+
+name: CI
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+# A new push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (NestJS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      # The Prisma client is generated code that nothing is committed for, so
+      # tsc cannot resolve @prisma/client without this. It needs no database —
+      # only a syntactically valid URL for the mongodb provider, hence the dummy.
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: mongodb://localhost:27017/ci?replicaSet=rs0
+
+      - name: Validate the Prisma schema
+        run: npx prisma validate
+        env:
+          DATABASE_URL: mongodb://localhost:27017/ci?replicaSet=rs0
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build
+        run: npx next build
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: a credential committed and then "removed" is still in the
+      # earlier commit, and that is exactly the case worth catching.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Mirrors the patterns in scripts/release.ps1, so a push and a release
+      # cannot disagree about what counts as a leak. Vendor prefixes only —
+      # every hit is a real credential shape, not a heuristic.
+      - name: Scan tracked files for credential patterns
+        run: |
+          set -e
+          patterns=(
+            'ATATT[A-Za-z0-9_-]{20,}'
+            'pk_[0-9]{6,}_[A-Z0-9]{20,}'
+            'lin_api_[A-Za-z0-9]{20,}'
+            'gsk_[A-Za-z0-9]{30,}'
+            'sk-[A-Za-z0-9]{32,}'
+            'AKIA[0-9A-Z]{16}'
+            'GOCSPX-[A-Za-z0-9_-]{20,}'
+            'BEGIN [A-Z ]*PRIVATE KEY'
+          )
+          found=0
+          for p in "${patterns[@]}"; do
+            if git grep -nIE "$p" -- . ; then
+              echo "::error::credential pattern matched: $p"
+              found=1
+            fi
+          done
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::an .env file is tracked"
+            found=1
+          fi
+          if [ "$found" -ne 0 ]; then exit 1; fi
+          echo "No credential patterns in tracked files."
