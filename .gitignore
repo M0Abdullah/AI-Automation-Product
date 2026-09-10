@@ -4,15 +4,24 @@ node_modules/
 .env
 .env.local
 *.env.local
-# build output
+# build output. Anchored for the same reason as /artifacts/ below.
+/backend/dist/
+/frontend/.next/
+/frontend/out/
 dist/
 .next/
 out/
 # generated prisma client
 backend/src/generated/
 # test evidence (screenshots / traces / videos)
-artifacts/
-!artifacts/.gitkeep
+#
+# ANCHORED with a leading slash, and that matters: the unanchored form
+# "artifacts/" matches a directory of that name at ANY depth, which silently
+# excluded backend/src/artifacts/ - the source module that serves the evidence.
+# The published repo would not compile from a fresh clone, and it only showed
+# up once CI built from tracked files instead of a working copy.
+/artifacts/
+!/artifacts/.gitkeep
 # logs
 *.log
 npm-debug.log*
