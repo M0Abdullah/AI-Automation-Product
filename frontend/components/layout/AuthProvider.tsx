@@ -2,8 +2,8 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import * as api from '../lib/api';
-import { canWrite, tokenStore, type AuthUser } from '../lib/auth';
+import * as api from '@/lib/api';
+import { canWrite, tokenStore, type AuthUser } from '@/lib/auth';
 
 /**
  * SESSION STATE FOR THE WHOLE APP.
@@ -65,7 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const fresh = await api.getMe();
-        if (!cancelled) setUser({ id: fresh.id, email: fresh.email, name: fresh.name, role: fresh.role });
+        if (!cancelled)
+          setUser({ id: fresh.id, email: fresh.email, name: fresh.name, role: fresh.role });
       } catch {
         if (!cancelled) {
           tokenStore.clear();

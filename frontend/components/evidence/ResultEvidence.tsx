@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { artifactUrl, getResult } from '../lib/api';
-import type { ResultDetail } from '../lib/types';
-import { ScreenshotPanel } from './ScreenshotPanel';
-import { ExecutedSteps } from './StepTimeline';
-import { ResultStatusBadge } from './StatusBadge';
+import { getResult } from '@/lib/api';
+import type { ResultDetail } from '@/lib/types';
+import { ScreenshotPanel } from '@/components/evidence/ScreenshotPanel';
+import { ExecutedSteps } from '@/components/evidence/StepTimeline';
+import { ResultStatusBadge } from '@/components/ui/StatusBadge';
 
 /**
  * THE "WHY DID IT FAIL" PANEL.
@@ -90,7 +90,6 @@ export function ResultEvidence({ resultId }: { resultId: string }) {
         <ExecutedSteps stepResults={result.stepResults} />
       </div>
 
-      {/* ------------------------------------------------ API / network errors */}
       <details className="collapse" open={result.apiErrors.length > 0}>
         <summary>
           Failed API requests ({result.apiErrors.length})
@@ -108,7 +107,9 @@ export function ResultEvidence({ resultId }: { resultId: string }) {
               <div className="log-line log-err" key={n.id}>
                 {n.method} {n.url}
                 {' → '}
-                {n.failureText ? `NETWORK FAILURE: ${n.failureText}` : `${n.status} ${n.statusText ?? ''}`}
+                {n.failureText
+                  ? `NETWORK FAILURE: ${n.failureText}`
+                  : `${n.status} ${n.statusText ?? ''}`}
                 {n.durationMs ? ` (${n.durationMs}ms)` : ''}
               </div>
             ))}
@@ -116,7 +117,6 @@ export function ResultEvidence({ resultId }: { resultId: string }) {
         )}
       </details>
 
-      {/* ---------------------------------------------------- console errors */}
       <details className="collapse" open={result.consoleErrors.length > 0}>
         <summary>
           Console errors ({result.consoleErrors.length})
@@ -164,7 +164,6 @@ export function ResultEvidence({ resultId }: { resultId: string }) {
         </div>
       </details>
 
-      {/* ------------------------------------------------------------ artifacts */}
       {(result.screenshotPath || result.tracePath) && (
         <div className="card card-tight">
           <div className="faint" style={{ marginBottom: 7 }}>

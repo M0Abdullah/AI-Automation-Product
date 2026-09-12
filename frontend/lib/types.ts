@@ -17,21 +17,10 @@ export type RunStatus =
 
 export type ResultStatus = 'PASS' | 'FAIL' | 'FLAKY' | 'ERROR' | 'SKIPPED';
 
-export type FindingStatus =
-  | 'NEW'
-  | 'TRIAGED'
-  | 'CONFIRMED'
-  | 'REJECTED'
-  | 'REOPENED'
-  | 'CLOSED';
+export type FindingStatus = 'NEW' | 'TRIAGED' | 'CONFIRMED' | 'REJECTED' | 'REOPENED' | 'CLOSED';
 
 export type Classification =
-  | 'PRODUCT_BUG'
-  | 'TEST_DEFECT'
-  | 'ENVIRONMENT_ISSUE'
-  | 'TEST_DATA_ISSUE'
-  | 'FLAKY'
-  | 'UNKNOWN';
+  'PRODUCT_BUG' | 'TEST_DEFECT' | 'ENVIRONMENT_ISSUE' | 'TEST_DATA_ISSUE' | 'FLAKY' | 'UNKNOWN';
 
 export interface TestStep {
   action: string;
@@ -132,21 +121,10 @@ export interface FindingEvent {
  * a defect can be PRODUCT_BUG + UI_VISUAL, or PRODUCT_BUG + DATA.
  */
 export type BugCategory =
-  | 'FUNCTIONAL'
-  | 'TECHNICAL'
-  | 'DATA'
-  | 'CONTENT'
-  | 'UI_VISUAL'
-  | 'LOADING'
-  | 'UNKNOWN';
+  'FUNCTIONAL' | 'TECHNICAL' | 'DATA' | 'CONTENT' | 'UI_VISUAL' | 'LOADING' | 'UNKNOWN';
 
 export type ContentIssueKind =
-  | 'TYPO'
-  | 'GRAMMAR'
-  | 'LABEL'
-  | 'CASING'
-  | 'PLACEHOLDER'
-  | 'INCONSISTENT';
+  'TYPO' | 'GRAMMAR' | 'LABEL' | 'CASING' | 'PLACEHOLDER' | 'INCONSISTENT';
 
 /**
  * An advisory wording problem found by reading the page text.
@@ -302,13 +280,7 @@ export interface PageSnapshot {
 }
 
 export type RunPageStatus =
-  | 'DISCOVERED'
-  | 'SCANNING'
-  | 'SCANNED'
-  | 'PLANNED'
-  | 'SCAN_FAILED'
-  | 'PLAN_FAILED'
-  | 'SKIPPED';
+  'DISCOVERED' | 'SCANNING' | 'SCANNED' | 'PLANNED' | 'SCAN_FAILED' | 'PLAN_FAILED' | 'SKIPPED';
 
 /**
  * ONE PAGE OF THE APP UNDER TEST.

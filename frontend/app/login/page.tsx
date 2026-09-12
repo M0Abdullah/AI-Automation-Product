@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useAuth } from '../../components/AuthProvider';
-import { ThemeToggle } from '../../components/ThemeToggle';
-import type { ApiError } from '../../lib/api';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import type { ApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const { signIn } = useAuth();

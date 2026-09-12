@@ -47,7 +47,9 @@ async function main() {
           const r = el.getBoundingClientRect();
           if (r.width === 0 && r.height === 0) return false;
           const s = window.getComputedStyle(el);
-          return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity || '1') > 0.05;
+          return (
+            s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity || '1') > 0.05
+          );
         };
         const c = document.querySelectorAll(
           'input:not([type="hidden"]), textarea, select, button, a[href], [role="button"]',
@@ -88,7 +90,9 @@ async function main() {
     return {
       inputs: Array.from(document.querySelectorAll('input, textarea, select'))
         .filter(vis)
-        .map((e) => `${e.tagName.toLowerCase()}[${(e as HTMLInputElement).type ?? ''}] "${label(e)}"`)
+        .map(
+          (e) => `${e.tagName.toLowerCase()}[${(e as HTMLInputElement).type ?? ''}] "${label(e)}"`,
+        )
         .slice(0, 30),
       buttons: Array.from(document.querySelectorAll('button, input[type=submit], [role=button]'))
         .filter(vis)

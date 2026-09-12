@@ -63,6 +63,12 @@ jobs:
         env:
           DATABASE_URL: mongodb://localhost:27017/ci?replicaSet=rs0
 
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json
 
@@ -86,6 +92,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json

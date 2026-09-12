@@ -105,8 +105,7 @@ export const TEST_PLAN_JSON_SCHEMA = {
                   valueRef: {
                     type: 'string',
                     enum: ['test_email', 'test_password'],
-                    description:
-                      'Use this instead of a real credential. Never write a password.',
+                    description: 'Use this instead of a real credential. Never write a password.',
                   },
                   value: {
                     type: 'string',

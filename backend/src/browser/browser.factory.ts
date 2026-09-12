@@ -74,9 +74,7 @@ export class BrowserFactory implements OnModuleDestroy {
         this.activeChannel = attempt.channel ?? 'chromium';
         this.browser = browser;
         this.launching = undefined;
-        this.logger.log(
-          `Launched ${attempt.label} ${browser.version()} (headless=${headless})`,
-        );
+        this.logger.log(`Launched ${attempt.label} ${browser.version()} (headless=${headless})`);
         browser.on('disconnected', () => {
           this.logger.warn('Browser disconnected - it will be relaunched on next use');
           this.browser = undefined;

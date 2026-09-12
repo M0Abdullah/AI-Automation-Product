@@ -94,7 +94,7 @@ export interface DesignComparison {
   byGroup: Record<string, number>;
 }
 
-// ---------------------------------------------------------- near-miss windows
+// Near-miss windows
 /** Geometry: how many px off a spec value still counts as "meant to be that". */
 const NEAR_MISS_PX = 4;
 /** Font sizes are a tighter scale, so the window is tighter too. */
@@ -403,7 +403,7 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
       elementChecked = elementChecked || b;
     };
 
-    // ------------------------------------------------------------------ SIZE
+    // SIZE
     if (m.kind === 'button') {
       did(
         checkNumber({
@@ -454,7 +454,7 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
       );
     }
 
-    // ------------------------------------------------------------------ ICON
+    // ICON
     if (m.kind === 'icon') {
       did(
         checkNumber({
@@ -472,7 +472,7 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
       );
     }
 
-    // --------------------------------------------------------------- SPACING
+    // SPACING
     if (m.padding > 0) {
       did(
         checkNumber({
@@ -500,7 +500,7 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
       );
     }
 
-    // ------------------------------------------------------------ TYPOGRAPHY
+    // TYPOGRAPHY
     if (m.text) {
       did(
         checkNumber({
@@ -553,7 +553,7 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
       }
     }
 
-    // ---------------------------------------------------------------- COLOUR
+    // COLOUR
     if (m.text) {
       did(
         checkColour({
@@ -593,10 +593,9 @@ export function compareToSpec(measured: MeasuredElement[], spec: DesignSpec): De
           // Falls back to the surface palette: many designs draw borders with a
           // colour from the same ramp rather than declaring a stroke style.
           palette: spec.borderColors.length ? spec.borderColors : spec.colors,
-          note:
-            spec.borderColors.length
-              ? `The design's border colours are ${spec.borderColors.slice(0, 6).join(', ')}.`
-              : 'Compared against the design\'s surface palette - it declares no stroke styles.',
+          note: spec.borderColors.length
+            ? `The design's border colours are ${spec.borderColors.slice(0, 6).join(', ')}.`
+            : "Compared against the design's surface palette - it declares no stroke styles.",
         }),
       );
     }

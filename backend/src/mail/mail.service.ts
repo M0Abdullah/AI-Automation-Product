@@ -107,7 +107,7 @@ export class MailService implements OnModuleInit {
     return `${this.config.mail.appUrl.replace(/\/$/, '')}${path}`;
   }
 
-  // ======================================================= account events
+  // Account events
 
   /**
    * NEW SIGN-IN ALERT.
@@ -204,7 +204,7 @@ export class MailService implements OnModuleInit {
     return this.send(input.to, `New account: ${input.newUserName}`, body.html, body.text);
   }
 
-  // =========================================================== run events
+  // Run events
 
   /**
    * WORK HAS STARTED — sent once the pages are known.
@@ -248,12 +248,7 @@ export class MailService implements OnModuleInit {
           : 'This usually takes under a minute.',
     });
 
-    return this.send(
-      input.to,
-      `Testing started — ${input.runName}`,
-      body.html,
-      body.text,
-    );
+    return this.send(input.to, `Testing started — ${input.runName}`, body.html, body.text);
   }
 
   /**
@@ -324,7 +319,6 @@ export class MailService implements OnModuleInit {
       );
     }
 
-
     const body = layout({
       preheader: headline,
       heading: headline,
@@ -347,7 +341,6 @@ export class MailService implements OnModuleInit {
 
     return this.send(input.to, `${headline} — ${input.runName}`, body.html, body.text);
   }
-
 }
 
 /** "chrome 151 on Windows" rather than 180 characters of UA string. */

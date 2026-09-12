@@ -158,16 +158,21 @@ export class FigmaService {
 
   private hintFor(status: number, body: string): string {
     if (status === 403 && /scope/i.test(body)) {
-      return 'The token is missing the file_content:read scope. In Figma: Settings > ' +
-        'Security > Generate new token, and tick ONLY "file_content:read".';
+      return (
+        'The token is missing the file_content:read scope. In Figma: Settings > ' +
+        'Security > Generate new token, and tick ONLY "file_content:read".'
+      );
     }
     if (status === 403) {
-      return 'The token cannot read this file. Confirm the file is in this Figma ' +
-        'account, and that the token has file_content:read.';
+      return (
+        'The token cannot read this file. Confirm the file is in this Figma ' +
+        'account, and that the token has file_content:read.'
+      );
     }
     if (status === 404) {
-      return 'Check the file key. In a URL like figma.com/design/ABC123/My-File, the ' +
-        'key is ABC123.';
+      return (
+        'Check the file key. In a URL like figma.com/design/ABC123/My-File, the ' + 'key is ABC123.'
+      );
     }
     if (status === 429) {
       return 'Figma is rate-limiting this token. Wait a minute and try again.';

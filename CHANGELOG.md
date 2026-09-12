@@ -88,6 +88,44 @@ No secret or token to configure; `GITHUB_TOKEN` is issued to the run.
 
 ### Housekeeping
 
+**Lint and formatting, actually installed.** Both apps had a `lint` script and
+the backend had a `test` script; none of the tools behind them were installed,
+so all three failed on sight. ESLint 9 (flat config) and Prettier are now real
+dependencies, wired into `npm run lint` / `format` and enforced in CI. The dead
+`test` script is gone rather than left to fail — there are no tests yet, and a
+script that always fails is worse than no script.
+
+The backend config enables the type-aware rules that pay for themselves
+(`no-floating-promises`, `no-misused-promises`, `consistent-type-imports`) but
+deliberately not the `no-unsafe-*` family: the values it objects to are LLM
+responses and Playwright `evaluate` returns, genuinely `any` at the boundary,
+and switching it on today means 57 errors nobody will fix and a lint everyone
+learns to ignore. Typing those two boundaries is its own change.
+
+The first run found real dead code: an unused `artifactUrl` import, a computed
+`kind` that was never read, three unused type imports and two inline
+`import('playwright')` annotations. All removed.
+
+**Source layout.** Frontend components are grouped by where they are used —
+`ui/`, `layout/`, `runs/`, `evidence/`, `findings/`, `account/` — instead of one
+flat folder of seventeen, and every import now goes through the `@/` alias that
+`tsconfig.json` already declared but nothing used. `../../../components/X` is
+unreadable at the second `../` and breaks silently when a file moves.
+
+On the backend, `content-issues` and `design-issues` became their own modules
+rather than extra controllers inside `runs/`, and the diagnostics controller
+moved out of `common/` into `system/`. A controller's folder should be findable
+from its route.
+
+**Comments.** 101 decorative divider banners lost their rulers and kept their
+labels; JSX section dividers went entirely. Comments describing the approval
+gate, ticket exports and Jira were rewritten or removed — a comment that
+describes code that no longer exists is worse than none.
+
+**`.gitattributes`.** LF in the repository, CRLF only for `.ps1`. Without it a
+Windows checkout and a CI checkout disagree about every line, and a one-line
+change reviews as a whole-file rewrite.
+
 Root directory tidied: six unreferenced UI preview PNGs removed,
 `kill-ports.ps1` moved into `scripts/` beside the other operational scripts,
 and `frontend/tsconfig.tsbuildinfo` untracked (`*.tsbuildinfo` now ignored).

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useAuth } from '../../components/AuthProvider';
-import { ThemeToggle } from '../../components/ThemeToggle';
-import type { ApiError } from '../../lib/api';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import type { ApiError } from '@/lib/api';
 
 /**
  * Registration.
@@ -59,9 +59,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="auth-title">Create your account</div>
-        <div className="auth-sub">
-          Runs, findings and tickets are recorded against your name.
-        </div>
+        <div className="auth-sub">Runs, findings and tickets are recorded against your name.</div>
 
         {error && (
           <div className="banner banner-error" style={{ marginBottom: 16 }}>

@@ -1,4 +1,4 @@
-import type { FindingStatus, ResultStatus, RunStatus } from '../lib/types';
+import type { FindingStatus, ResultStatus, RunStatus } from '@/lib/types';
 
 type Tone = 'pass' | 'fail' | 'warn' | 'info' | 'neutral' | 'brand';
 
@@ -85,7 +85,13 @@ export function FindingStatusBadge({ status }: { status: FindingStatus }) {
  */
 export function PriorityBadge({ priority }: { priority: string }) {
   const tone: Tone =
-    priority === 'P0' ? 'fail' : priority === 'P1' ? 'warn' : priority === 'P2' ? 'info' : 'neutral';
+    priority === 'P0'
+      ? 'fail'
+      : priority === 'P1'
+        ? 'warn'
+        : priority === 'P2'
+          ? 'info'
+          : 'neutral';
   return (
     <Badge tone={tone} plain>
       {priority}
@@ -147,12 +153,12 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 const CATEGORY_ICON: Record<string, string> = {
-  FUNCTIONAL: '⚙',   // gear - behaviour
-  TECHNICAL: '⚡',    // bolt - crash / request
-  DATA: '▤',         // rows - values
-  CONTENT: '“',      // quote - wording
-  UI_VISUAL: '◱',    // shaded box - layout
-  LOADING: '◌',      // dotted circle - spinner
+  FUNCTIONAL: '⚙', // gear - behaviour
+  TECHNICAL: '⚡', // bolt - crash / request
+  DATA: '▤', // rows - values
+  CONTENT: '“', // quote - wording
+  UI_VISUAL: '◱', // shaded box - layout
+  LOADING: '◌', // dotted circle - spinner
   UNKNOWN: '?',
 };
 
@@ -164,4 +170,3 @@ export function CategoryBadge({ value }: { value?: string | null }) {
     </span>
   );
 }
-

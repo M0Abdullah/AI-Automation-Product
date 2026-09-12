@@ -2,13 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import {
-  ClassificationBadge,
-  PriorityBadge,
-  RunStatusBadge,
-} from '../components/StatusBadge';
-import { getDashboard } from '../lib/api';
-import { SEVERITY_LABEL, type DashboardOverview } from '../lib/types';
+import { ClassificationBadge, PriorityBadge, RunStatusBadge } from '@/components/ui/StatusBadge';
+import { getDashboard } from '@/lib/api';
+import { SEVERITY_LABEL, type DashboardOverview } from '@/lib/types';
 
 /**
  * THE DASHBOARD.
@@ -54,7 +50,6 @@ export default function DashboardPage() {
 
   return (
     <div className="stack">
-      {/* ------------------------------------------------------------ header */}
       <div className="spread page-hero">
         <div>
           <span className="eyebrow">Quality overview</span>
@@ -73,7 +68,6 @@ export default function DashboardPage() {
         <EmptyState />
       ) : (
         <>
-          {/* ------------------------------------------------ suite health */}
           <div className="grid-sidebar">
             <div className="card suite-health-card">
               <div className="card-head">
@@ -117,7 +111,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ------------------------------------------- needs attention */}
             <div className="card">
               <div className="card-head">
                 <h2>Needs you today</h2>
@@ -139,7 +132,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ----------------------------------------- queues + trust panel */}
           <div className="grid-sidebar">
             <div className="stack">
               {data.needsTriage.length > 0 && (
@@ -178,11 +170,9 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-
             </div>
 
             <div className="stack">
-              {/* ------------------------------------------ trust in the AI */}
               {findings.confirmed > 0 && (
                 <div className="card">
                   <div className="card-head">
@@ -245,15 +235,14 @@ export default function DashboardPage() {
                   </dd>
                   <dt>AI tokens</dt>
                   <dd className="faint">
-                    {data.llm.tokensIn.toLocaleString()} in /{' '}
-                    {data.llm.tokensOut.toLocaleString()} out
+                    {data.llm.tokensIn.toLocaleString()} in / {data.llm.tokensOut.toLocaleString()}{' '}
+                    out
                   </dd>
                 </dl>
               </div>
             </div>
           </div>
 
-          {/* ------------------------------------------------- recent runs */}
           <div className="card">
             <div className="card-head">
               <h2>Recent runs</h2>
@@ -326,9 +315,7 @@ function ResultBar({ tests }: { tests: DashboardOverview['tests'] }) {
       <div className="row faint" style={{ marginTop: 7, gap: 12 }}>
         {segments.map((s) => (
           <span key={s.label} className="row" style={{ gap: 5 }}>
-            <span
-              style={{ width: 8, height: 8, borderRadius: 2, background: s.color }}
-            />
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
             {s.value} {s.label}
           </span>
         ))}
@@ -417,16 +404,37 @@ function Stat({
  */
 function EmptyState() {
   const steps = [
-    { n: '1', title: 'Give it a page', body: 'A staging URL you are allowed to test, and tick what should be checked.' },
-    { n: '2', title: 'Approve the tests', body: 'Chrome reads the page, the AI writes the cases. Nothing runs until you say so.' },
-    { n: '3', title: 'Get the evidence', body: 'Screenshot, console and network logs, and whether it is really our bug.' },
+    {
+      n: '1',
+      title: 'Give it a page',
+      body: 'A staging URL you are allowed to test, and tick what should be checked.',
+    },
+    {
+      n: '2',
+      title: 'It tests itself',
+      body: 'Chrome reads the page, the AI writes the cases, and they run. Nothing to press.',
+    },
+    {
+      n: '3',
+      title: 'Get the evidence',
+      body: 'Screenshot, console and network logs, emailed to you when it finishes.',
+    },
   ];
 
   return (
     <div className="onboard">
       <div className="onboard-head">
         <span className="onboard-mark" aria-hidden>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M4 6h16M4 12h10M4 18h7" />
             <circle cx="17.5" cy="16.5" r="4" />
             <path d="m20.5 19.5 2 2" />
@@ -434,8 +442,8 @@ function EmptyState() {
         </span>
         <h2>No test runs yet</h2>
         <p>
-          Point it at a page you are authorised to test. It reads the page in real Chrome,
-          proposes the test cases, and waits for your approval before anything runs.
+          Point it at a page you are authorised to test. It reads the page in real Chrome, proposes
+          the test cases, and waits for your approval before anything runs.
         </p>
         <Link href="/runs/new" className="btn btn-primary btn-lg">
           Start your first run
@@ -453,8 +461,8 @@ function EmptyState() {
       </div>
 
       <p className="onboard-foot">
-        Across three real applications it has never once reported a failure as our bug when it
-        was not. Every verdict is a plain assertion, and every bug needs a human to confirm it.
+        Across three real applications it has never once reported a failure as our bug when it was
+        not. Every verdict is a plain assertion, and every bug needs a human to confirm it.
       </p>
     </div>
   );

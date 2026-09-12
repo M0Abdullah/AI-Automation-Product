@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { FindingCard } from '../../components/FindingCard';
-import { getFindingStats, listFindings } from '../../lib/api';
-import type { Finding, FindingStatus } from '../../lib/types';
+import { FindingCard } from '@/components/findings/FindingCard';
+import { getFindingStats, listFindings } from '@/lib/api';
+import type { Finding, FindingStatus } from '@/lib/types';
 
 /**
  * THE TRIAGE INBOX.

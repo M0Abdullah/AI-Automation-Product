@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { artifactUrl } from '../lib/api';
+import { artifactUrl } from '@/lib/api';
 
 /**
  * THE SCREENSHOT, VISIBLE WITHOUT DIGGING.

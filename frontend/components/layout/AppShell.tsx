@@ -3,17 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getFindingStats, getHealth } from '../lib/api';
-import { ROLE_LABEL } from '../lib/auth';
-import { useAuth } from './AuthProvider';
-import { ThemeToggle } from './ThemeToggle';
+import { getFindingStats, getHealth } from '@/lib/api';
+import { ROLE_LABEL } from '@/lib/auth';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import {
   IconAlert,
   IconDashboard,
   IconHistory,
   IconPlus,
   IconSettings,
-} from './Icons';
+} from '@/components/ui/Icons';
 
 /**
  * The application frame: sidebar navigation, top bar, health indicator.

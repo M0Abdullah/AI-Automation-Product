@@ -16,11 +16,13 @@
     "setup": "npm install && npm run prisma:generate && npm run prisma:push && npm run playwright:install",
     "check:llm": "ts-node -r tsconfig-paths/register scripts/check-llm.ts",
     "check:browser": "ts-node -r tsconfig-paths/register scripts/check-browser.ts",
-    "lint": "eslint \"src/**/*.ts\" --fix",
-    "test": "jest",
+    "lint": "eslint .",
     "set:owner": "ts-node -r tsconfig-paths/register scripts/set-owner.ts",
     "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/kill-ports.ps1",
-    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/release.ps1"
+    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/release.ps1",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"scripts/**/*.ts\""
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -41,15 +43,20 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
     "prisma": "^6.2.0",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.70.0"
   },
   "license": "UNLICENSED"
 }

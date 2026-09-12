@@ -1,4 +1,4 @@
-import { Page } from 'playwright';
+import { type Page } from 'playwright';
 import type { TestAssertion } from '../common/test-plan.types';
 import { AssertionFailedError } from './browser.types';
 import type { EvidenceCollector } from './evidence-collector';
@@ -85,7 +85,7 @@ export async function runAssertion(
           actual: 'visible',
           message: `matched by ${strategy}`,
         };
-      } catch (err) {
+      } catch {
         throw new AssertionFailedError(
           `Expected "${target}" to be visible on the page, but it was not found or not visible.`,
           `"${target}" is visible`,
@@ -130,10 +130,18 @@ export async function runAssertion(
             truncate(actual),
           );
         }
-        return { expected: `contains "${want}"`, actual: truncate(actual), message: `via ${strategy}` };
+        return {
+          expected: `contains "${want}"`,
+          actual: truncate(actual),
+          message: `via ${strategy}`,
+        };
       }
 
-      const body = (await page.locator('body').innerText().catch(() => '')) || '';
+      const body =
+        (await page
+          .locator('body')
+          .innerText()
+          .catch(() => '')) || '';
       if (!body.toLowerCase().includes(want.toLowerCase())) {
         throw new AssertionFailedError(
           `Page should contain the text "${want}" but it does not.`,
@@ -150,7 +158,9 @@ export async function runAssertion(
 
     case 'textNotContains': {
       const want = a.value ?? '';
-      const scope = a.target ? (await resolveLocator(page, a.target, 'text', timeoutMs)).locator : page.locator('body');
+      const scope = a.target
+        ? (await resolveLocator(page, a.target, 'text', timeoutMs)).locator
+        : page.locator('body');
       const actual = (await scope.innerText().catch(() => '')) || '';
       if (actual.toLowerCase().includes(want.toLowerCase())) {
         throw new AssertionFailedError(
@@ -307,7 +317,11 @@ export async function runAssertion(
       let scopeLabel: string;
       if (where) {
         const { locator, strategy } = await resolveLocator(page, where, 'text', timeoutMs);
-        haystack = (await locator.first().innerText().catch(() => '')) || '';
+        haystack =
+          (await locator
+            .first()
+            .innerText()
+            .catch(() => '')) || '';
         scopeLabel = `inside "${where}" (${strategy})`;
       } else {
         haystack = await page.evaluate(() => document.body.innerText ?? '');
@@ -361,12 +375,12 @@ async function findVisibleLoader(
   scopeSelector?: string,
 ): Promise<{ text: string; how: string } | null> {
   return page.evaluate((scope) => {
-    const root: ParentNode =
-      (scope ? document.querySelector(scope) : null) ?? document;
+    const root: ParentNode = (scope ? document.querySelector(scope) : null) ?? document;
 
     const onScreen = (el: Element): boolean => {
       const s = window.getComputedStyle(el);
-      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+      if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0)
+        return false;
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
     };
@@ -418,7 +432,7 @@ function extractField(json: unknown, field: string): string | null {
     return null;
   };
 
-  // --- exact dotted path
+  // Exact dotted path
   let cur: unknown = json;
   for (const part of field.split('.')) {
     if (cur && typeof cur === 'object' && part in (cur as Record<string, unknown>)) {
@@ -431,7 +445,7 @@ function extractField(json: unknown, field: string): string | null {
   const direct = scalar(cur);
   if (direct !== null) return direct;
 
-  // --- breadth-first search for the leaf key
+  // Breadth-first search for the leaf key
   const leaf = field.split('.').pop() ?? field;
   const queue: unknown[] = [json];
   let guard = 0;

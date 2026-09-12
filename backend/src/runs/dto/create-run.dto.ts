@@ -141,7 +141,7 @@ export class CreateRunDto {
   )
   designPageUrl?: string;
 
-  // ------------------------------------------------------------- whole app ---
+  // Whole app
 
   /**
    * TEST THE WHOLE APP, not just the URL given.

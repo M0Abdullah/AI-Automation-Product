@@ -1,5 +1,5 @@
-import { Page } from 'playwright';
-import { ACTION_TARGET_KIND, TestStep } from '../common/test-plan.types';
+import { type Page } from 'playwright';
+import type { TestStep } from '../common/test-plan.types';
 import { resolveLocator } from './locator-resolver';
 import { waitForInteractiveContent, type SettleOptions } from './page-settle';
 
@@ -52,7 +52,6 @@ export async function executeStep(
   step: TestStep,
   ctx: ActionContext,
 ): Promise<ActionOutcome> {
-  const kind = ACTION_TARGET_KIND[step.action];
   const { action: actionTimeout, navigation: navTimeout } = ctx.timeouts;
 
   switch (step.action) {
@@ -70,13 +69,23 @@ export async function executeStep(
     }
 
     case 'click': {
-      const { locator, strategy } = await resolveLocator(page, step.target, 'clickable', actionTimeout);
+      const { locator, strategy } = await resolveLocator(
+        page,
+        step.target,
+        'clickable',
+        actionTimeout,
+      );
       await locator.click({ timeout: actionTimeout });
       return { locatorStrategy: strategy, message: 'clicked' };
     }
 
     case 'hover': {
-      const { locator, strategy } = await resolveLocator(page, step.target, 'clickable', actionTimeout);
+      const { locator, strategy } = await resolveLocator(
+        page,
+        step.target,
+        'clickable',
+        actionTimeout,
+      );
       await locator.hover({ timeout: actionTimeout });
       return { locatorStrategy: strategy, message: 'hovered' };
     }

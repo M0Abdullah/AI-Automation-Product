@@ -60,7 +60,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     if (status >= 500) {
-      this.logger.error(`${req.method} ${req.url} -> ${status} ${message}`, (exception as Error)?.stack);
+      this.logger.error(
+        `${req.method} ${req.url} -> ${status} ${message}`,
+        (exception as Error)?.stack,
+      );
     } else {
       this.logger.warn(`${req.method} ${req.url} -> ${status} ${message}`);
     }

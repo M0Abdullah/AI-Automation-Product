@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
-import { AppShell } from '../components/AppShell';
-import { AuthProvider } from '../components/AuthProvider';
-import { THEME_INIT_SCRIPT } from '../components/ThemeToggle';
+import { AppShell } from '@/components/layout/AppShell';
+import { AuthProvider } from '@/components/layout/AuthProvider';
+import { THEME_INIT_SCRIPT } from '@/components/ui/ThemeToggle';
 
 /**
  * Self-hosted by next/font at build time, so there is no runtime request to

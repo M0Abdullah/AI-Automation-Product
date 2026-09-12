@@ -45,18 +45,18 @@ export class ArtifactsController {
     const stat = await fs.stat(abs).catch(() => null);
     if (!stat?.isFile()) throw new NotFoundException(`Artifact not found: ${rel}`);
 
-    const type =
-      abs.endsWith('.png')
-        ? 'image/png'
-        : abs.endsWith('.zip')
-          ? 'application/zip'
-          : abs.endsWith('.webm')
-            ? 'video/webm'
-            : 'application/octet-stream';
+    const type = abs.endsWith('.png')
+      ? 'image/png'
+      : abs.endsWith('.zip')
+        ? 'application/zip'
+        : abs.endsWith('.webm')
+          ? 'video/webm'
+          : 'application/octet-stream';
 
     return new StreamableFile(createReadStream(abs), {
       type,
-      disposition: type === 'application/zip' ? `attachment; filename="${path.basename(abs)}"` : undefined,
+      disposition:
+        type === 'application/zip' ? `attachment; filename="${path.basename(abs)}"` : undefined,
       length: stat.size,
     });
   }

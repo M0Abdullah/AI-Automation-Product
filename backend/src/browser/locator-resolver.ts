@@ -1,4 +1,4 @@
-import { Locator, Page } from 'playwright';
+import { type Locator, type Page } from 'playwright';
 import { LocatorNotFoundError } from './browser.types';
 
 /**
@@ -55,7 +55,10 @@ function fieldCandidates(page: Page, target: string): Candidate[] {
 function clickableCandidates(page: Page, target: string): Candidate[] {
   const t = clean(target);
   return [
-    { strategy: 'role=button[name]', build: () => page.getByRole('button', { name: t, exact: true }) },
+    {
+      strategy: 'role=button[name]',
+      build: () => page.getByRole('button', { name: t, exact: true }),
+    },
     { strategy: 'role=link[name]', build: () => page.getByRole('link', { name: t, exact: true }) },
     {
       strategy: 'role=button[name](partial)',

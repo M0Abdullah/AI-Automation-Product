@@ -23,7 +23,9 @@ async function main() {
   const name = arg('name');
 
   if (!to) {
-    console.error('Usage: npm run set:owner -- --to new@email.com [--from old@email.com] [--name "Full Name"]');
+    console.error(
+      'Usage: npm run set:owner -- --to new@email.com [--from old@email.com] [--name "Full Name"]',
+    );
     process.exit(1);
   }
 

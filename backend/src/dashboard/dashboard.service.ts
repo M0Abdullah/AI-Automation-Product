@@ -100,7 +100,7 @@ export class DashboardService {
       }),
     ]);
 
-    // ---------------------------------------------------------- test health
+    // Test health
     const latest = testCases.map((tc) => tc.results[0]?.status ?? null);
     const executed = latest.filter(Boolean).length;
     const passed = latest.filter((s) => s === 'PASS').length;
@@ -111,7 +111,7 @@ export class DashboardService {
     // Rounded to a whole number: false precision on a small sample is noise.
     const passRate = executed ? Math.round((passed / executed) * 100) : null;
 
-    // ------------------------------------------------ how good is the AI?
+    // How good is the AI?
     // Test defects mean the generated test was wrong, product bugs mean the app
     // was wrong. The ratio is the honest measure of whether the tool is helping.
     const classifications = confirmedFindings.map(
@@ -135,8 +135,7 @@ export class DashboardService {
       },
       findings: {
         byStatus: toCounts(findingsByStatus),
-        awaitingTriage:
-          countOf(findingsByStatus, 'NEW') + countOf(findingsByStatus, 'REOPENED'),
+        awaitingTriage: countOf(findingsByStatus, 'NEW') + countOf(findingsByStatus, 'REOPENED'),
         confirmed: confirmedFindings.length,
         bySeverity: tally(confirmedFindings.map((f) => f.severity ?? 'UNSET')),
         byClassification: tally(classifications),

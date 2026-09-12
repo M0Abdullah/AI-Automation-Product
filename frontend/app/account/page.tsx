@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { IntegrationsPanel } from '../../components/IntegrationsPanel';
-import { useAuth } from '../../components/AuthProvider';
-import { getLoginHistory, getTeam } from '../../lib/api';
-import { ROLE_LABEL } from '../../lib/auth';
-import type { LoginSession, TeamMember } from '../../lib/types';
+import { IntegrationsPanel } from '@/components/account/IntegrationsPanel';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { getLoginHistory, getTeam } from '@/lib/api';
+import { ROLE_LABEL } from '@/lib/auth';
+import type { LoginSession, TeamMember } from '@/lib/types';
 
 /**
  * Account page: who you are, your login history, and the team.
@@ -56,7 +56,7 @@ export default function AccountPage() {
             <dt>Can edit</dt>
             <dd>
               {user.role === 'OWNER' || user.role === 'QA'
-                ? 'Yes — approve tests, triage findings, manage tickets'
+                ? 'Yes — edit and re-run tests, triage findings'
                 : 'No — read only, plus comments'}
             </dd>
           </dl>

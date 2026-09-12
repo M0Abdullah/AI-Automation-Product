@@ -1,4 +1,4 @@
-import { Page, Request, Response } from 'playwright';
+import { type Page, type Request, type Response } from 'playwright';
 import type { CapturedConsole, CapturedRequest } from './browser.types';
 
 /** One successful JSON response, parsed. */
@@ -43,7 +43,13 @@ export class EvidenceCollector {
     this.page.on('console', (msg) => {
       const type = msg.type();
       const level =
-        type === 'error' ? 'ERROR' : type === 'warning' ? 'WARNING' : type === 'debug' ? 'DEBUG' : 'INFO';
+        type === 'error'
+          ? 'ERROR'
+          : type === 'warning'
+            ? 'WARNING'
+            : type === 'debug'
+              ? 'DEBUG'
+              : 'INFO';
       // Only keep errors and warnings by default - info logs are noise and
       // would bloat both the database and the LLM prompt.
       if (level !== 'ERROR' && level !== 'WARNING') return;

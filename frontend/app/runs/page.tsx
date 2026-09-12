@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { RunStatusBadge } from '../../components/StatusBadge';
-import { listRuns } from '../../lib/api';
-import type { RunListItem } from '../../lib/types';
+import { RunStatusBadge } from '@/components/ui/StatusBadge';
+import { listRuns } from '@/lib/api';
+import type { RunListItem } from '@/lib/types';
 
 export default function RunsPage() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -62,7 +62,16 @@ export default function RunsPage() {
           {/* An inline mark rather than a bare glyph - the old play triangle
               rendered as a grey wedge that read as a broken image. */}
           <span className="empty-mark" aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 8v4l3 2" />
               <circle cx="12" cy="12" r="9" />
             </svg>

@@ -1,4 +1,4 @@
-import type { StepResult, TestAssertion, TestStep } from '../lib/types';
+import type { StepResult, TestAssertion, TestStep } from '@/lib/types';
 
 /**
  * Renders what the browser did, in order.
@@ -29,7 +29,11 @@ export function PlannedSteps({
           <div className="step-body">
             <div className="step-title">
               {s.action} <strong>&quot;{s.target}&quot;</strong>
-              {s.valueRef && <span className="pill" style={{ marginLeft: 6 }}>{s.valueRef}</span>}
+              {s.valueRef && (
+                <span className="pill" style={{ marginLeft: 6 }}>
+                  {s.valueRef}
+                </span>
+              )}
               {s.value && !s.valueRef && (
                 <span className="pill" style={{ marginLeft: 6 }}>
                   &quot;{s.value}&quot;

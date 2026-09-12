@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ApiError, createRun, getCapabilities } from '../lib/api';
-import type { CheckOption } from '../lib/types';
-import { CheckPicker } from './CheckPicker';
+import { ApiError, createRun, getCapabilities } from '@/lib/api';
+import type { CheckOption } from '@/lib/types';
+import { CheckPicker } from '@/components/runs/CheckPicker';
 
 /**
  * EVERYTHING WE ASK THE USER FOR.
@@ -72,7 +72,10 @@ export function RunForm() {
   }, []);
 
   const hasCredentials = Boolean(email.trim() || password.trim());
-  const ready = authorized && url.trim().length > 0 && (selected.length > 0 || requirements.trim().length >= 10);
+  const ready =
+    authorized &&
+    url.trim().length > 0 &&
+    (selected.length > 0 || requirements.trim().length >= 10);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +140,6 @@ export function RunForm() {
         </div>
       )}
 
-      {/* ---------------------------------------------------- 1. what to test */}
       <div className="card composer-url">
         <div className="step-head">
           <span className="step-num">1</span>
@@ -170,9 +172,9 @@ export function RunForm() {
           <span>
             <strong>Test the whole app, not just this page</strong>
             <span className="faint" style={{ display: 'block' }}>
-              We follow the links from this page to find your app&apos;s screens, then run
-              every check you tick on all of them &mdash; one run, one approval, one bug
-              list. External links, sign-out and anything destructive are never followed.
+              We follow the links from this page to find your app&apos;s screens, then run every
+              check you tick on all of them &mdash; one run, one approval, one bug list. External
+              links, sign-out and anything destructive are never followed.
             </span>
           </span>
         </label>
@@ -189,8 +191,8 @@ export function RunForm() {
                 onChange={(e) => setMaxPages(Number(e.target.value) || 1)}
               />
               <span className="field-hint">
-                Each page costs one browser scan and one AI call, so this is the dial that
-                decides how long the run takes. Start at 10.
+                Each page costs one browser scan and one AI call, so this is the dial that decides
+                how long the run takes. Start at 10.
               </span>
             </label>
 
@@ -202,8 +204,8 @@ export function RunForm() {
                 <option value={3}>3 &mdash; three clicks deep</option>
               </select>
               <span className="field-hint">
-                Pages are found nearest-first, so a small page budget is spent on the
-                screens a user actually reaches.
+                Pages are found nearest-first, so a small page budget is spent on the screens a user
+                actually reaches.
               </span>
             </label>
 
@@ -224,7 +226,6 @@ export function RunForm() {
         )}
       </div>
 
-      {/* --------------------------------------------------- 2. the checklist */}
       <div className="card composer-checks">
         <div className="step-head">
           <span className="step-num">2</span>
@@ -250,15 +251,14 @@ export function RunForm() {
         )}
       </div>
 
-      {/* ------------------------------------------------- 3. your own rules */}
       <div className="card composer-rules">
         <div className="step-head">
           <span className="step-num">3</span>
           <div>
             <h2>Your own rules</h2>
             <span className="faint">
-              Optional. For things only you know — what happens after login, what a
-              discount should do. One per line.
+              Optional. For things only you know — what happens after login, what a discount should
+              do. One per line.
             </span>
           </div>
         </div>
@@ -276,13 +276,10 @@ export function RunForm() {
           >
             Use an example
           </button>
-          <span className="faint">
-            The AI may not assert anything you did not write here.
-          </span>
+          <span className="faint">The AI may not assert anything you did not write here.</span>
         </div>
       </div>
 
-      {/* --------------------------------------------------- 4. credentials */}
       <div className="card composer-login">
         <div className="step-head">
           <span className="step-num">4</span>
@@ -347,9 +344,9 @@ export function RunForm() {
               />
               <span className="field-hint">
                 Leave empty to test the page as a visitor. Fill it in and we sign in{' '}
-                <strong>once</strong> before reading the page, then reuse that session for
-                every test — otherwise a protected URL just redirects to the login screen
-                and every test describes the wrong page. Must be on the same site.
+                <strong>once</strong> before reading the page, then reuse that session for every
+                test — otherwise a protected URL just redirects to the login screen and every test
+                describes the wrong page. Must be on the same site.
               </span>
             </label>
           </>
@@ -364,15 +361,14 @@ export function RunForm() {
         )}
       </div>
 
-      {/* ------------------------------------------------------- 5. figma */}
       <div className="card composer-figma">
         <div className="step-head">
           <span className="step-num">5</span>
           <div>
             <h2>Match against Figma</h2>
             <span className="faint">
-              Optional. Checks one page against your design&apos;s sizes, colours, type,
-              icons and spacing.
+              Optional. Checks one page against your design&apos;s sizes, colours, type, icons and
+              spacing.
             </span>
           </div>
           <button
@@ -397,11 +393,10 @@ export function RunForm() {
             />
             <span className="field-hint">
               Open the frame in Figma and copy the address bar &mdash; it needs the{' '}
-              <code>node-id</code> on the end, so we read that frame and not the whole file.
-              We read the design&apos;s button and input heights, corner radii, type scale,
-              weights, text and surface colours, icon sizes and spacing scale, then flag
-              anything on the page that is a hair off. Findings are suggestions, never
-              automatic bugs.
+              <code>node-id</code> on the end, so we read that frame and not the whole file. We read
+              the design&apos;s button and input heights, corner radii, type scale, weights, text
+              and surface colours, icon sizes and spacing scale, then flag anything on the page that
+              is a hair off. Findings are suggestions, never automatic bugs.
             </span>
           </label>
         ) : (
@@ -428,15 +423,14 @@ export function RunForm() {
               onChange={(e) => setDesignPageUrl(e.target.value)}
             />
             <span className="field-hint">
-              Leave blank to use the entry page. Every other check still runs on all the
-              pages we find &mdash; only the design comparison is limited to this one,
-              because a Figma frame is one screen&apos;s design.
+              Leave blank to use the entry page. Every other check still runs on all the pages we
+              find &mdash; only the design comparison is limited to this one, because a Figma frame
+              is one screen&apos;s design.
             </span>
           </label>
         )}
       </div>
 
-      {/* ------------------------------------------------------ confirm + go */}
       <div className="card composer-submit">
         <label className="field" style={{ marginBottom: 14 }}>
           <span className="field-label">Name this run (optional)</span>

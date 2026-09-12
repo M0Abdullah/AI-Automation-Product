@@ -87,7 +87,7 @@ export class RunPipelineService {
     private readonly mail: MailService,
   ) {}
 
-  // =========================================================== PLAN PHASE
+  // PLAN PHASE
 
   /** Fire-and-forget. Errors are recorded on the run, never thrown at HTTP. */
   startPlanning(runId: string): void {
@@ -103,7 +103,7 @@ export class RunPipelineService {
       include: { secret: true },
     });
 
-    // ------------------------------------------- 0. sign in, if asked to
+    // 0. sign in, if asked to
     // Before anything is read, on purpose. A protected URL redirects an
     // anonymous browser to the login page, so crawling or scanning first would
     // describe the wrong page and every generated test would assert against
@@ -121,7 +121,7 @@ export class RunPipelineService {
       storageState = established;
     }
 
-    // ------------------------------------------------ 1. discover the pages
+    // 1. discover the pages
     const pages = await this.discoverPages(run, storageState);
     if (!pages.length) return; // discoverPages already failed the run
 
@@ -149,7 +149,7 @@ export class RunPipelineService {
       });
     }
 
-    // --------------------------- 2. per page: scan, then ask for a test plan
+    // 2. per page: scan, then ask for a test plan
     await this.prisma.run.update({
       where: { id: runId },
       data: {
@@ -177,7 +177,7 @@ export class RunPipelineService {
     for (const [i, page] of pages.entries()) {
       const label = pages.length === 1 ? '' : ` (page ${i + 1} of ${pages.length})`;
 
-      // ------------------------------------------------------------ 2a. scan
+      // 2a. scan
       await this.prisma.runPage.update({
         where: { id: page.id },
         data: { status: RunPageStatus.SCANNING },
@@ -225,7 +225,7 @@ export class RunPipelineService {
       }
       scannedPages++;
 
-      // -------------------------------------------------------- 2b. the plan
+      // 2b. the plan
       // A run-wide ceiling as well as a per-page one: twelve pages at eight
       // cases each is 96 test cases, and nobody reviews 96 test cases. When
       // the budget runs out the remaining pages are marked SKIPPED rather than
@@ -290,7 +290,7 @@ export class RunPipelineService {
       llmMeta.tokensOut += plan.meta.tokensOut ?? 0;
       llmMeta.latencyMs += plan.meta.latencyMs ?? 0;
 
-      // ----------------------------------------------------- 2c. policy gate
+      // 2c. policy gate
       const perPage = Math.min(this.config.policy.maxTestCasesPerPage, remaining);
       const { accepted, rejections } = this.policy.review(
         plan.cases,
@@ -359,7 +359,7 @@ export class RunPipelineService {
       forContentCheck.push({ page, snapshot });
     }
 
-    // ------------------------------------------------------- 3. was it worth it
+    // 3. was it worth it
     if (!totalAccepted) {
       await this.fail(
         runId,
@@ -401,14 +401,14 @@ export class RunPipelineService {
         `page(s), ${totalRejected} rejected`,
     );
 
-    // ------------------------------- 4. wording pass (advisory, in the background)
+    // 4. wording pass (advisory, in the background)
     // Deliberately not awaited: it reads copy the scan already captured, so it
     // cannot influence the plan, and the browser tests must not queue behind a
     // spell-check of twelve pages. Sequential inside, to stay under the rate
     // limit.
     void this.runContentChecks(runId, forContentCheck);
 
-    // ------------------------------------------------- 5. run them
+    // 5. run them
     this.startExecution(runId);
   }
 
@@ -421,10 +421,7 @@ export class RunPipelineService {
    *
    * Returns an empty array after failing the run, so the caller can bail out.
    */
-  private async discoverPages(
-    run: Run,
-    storageState?: StorageState,
-  ): Promise<RunPage[]> {
+  private async discoverPages(run: Run, storageState?: StorageState): Promise<RunPage[]> {
     // A re-plan reuses the pages it already found. Re-crawling would spend
     // another minute of browser time to rediscover the same twelve URLs, and
     // worse, a nav bar that changed in the meantime would silently change what
@@ -598,7 +595,7 @@ export class RunPipelineService {
       .catch(() => undefined);
   }
 
-  // ======================================================== EXECUTE PHASE
+  // EXECUTE PHASE
 
   startExecution(runId: string): void {
     void this.executeApproved(runId).catch((err) => {
@@ -636,7 +633,7 @@ export class RunPipelineService {
 
     const values = this.secrets.buildRuntimeValues(run.secret);
 
-    // Reuse the sign-in captured before the scan. Approval can happen hours
+    // Reuse the sign-in captured before the scan. A re-run can happen hours
     // later, so the session may have expired in the meantime - if it has, sign
     // in again rather than running every test as an anonymous visitor.
     let storageState = this.loadSession(run.secret);
@@ -763,7 +760,13 @@ export class RunPipelineService {
    * stop a run from being planned.
    */
   private notifyRunStarted(
-    run: { id: string; name: string; targetUrl: string; crawlEnabled: boolean; createdById: string | null },
+    run: {
+      id: string;
+      name: string;
+      targetUrl: string;
+      crawlEnabled: boolean;
+      createdById: string | null;
+    },
     pageCount: number,
     signedIn: boolean,
   ): void {
@@ -870,7 +873,8 @@ export class RunPipelineService {
           summary: {
             totalPages: run.pages.length,
             pagesFailed: run.pages.filter(
-              (p) => p.status === RunPageStatus.SCAN_FAILED || p.status === RunPageStatus.PLAN_FAILED,
+              (p) =>
+                p.status === RunPageStatus.SCAN_FAILED || p.status === RunPageStatus.PLAN_FAILED,
             ).length,
             totalCases: run.testCases.length,
             executed: latest.filter(Boolean).length,
@@ -923,7 +927,7 @@ export class RunPipelineService {
     // whole-app mode, and for hand-written ones with no page.
     const startUrl = testCase.pageUrl ?? run.targetUrl;
 
-    // ------------------------------------------------------------ attempt 1
+    // Attempt 1
     const first = await this.executor.execute({
       testCase: executable,
       startUrl,
@@ -936,7 +940,7 @@ export class RunPipelineService {
 
     if (first.status === 'PASS') return;
 
-    // ------------------------------------- attempt 2 (reproducibility check)
+    // Attempt 2 (reproducibility check)
     // A single failure is not proof. A clean rerun separates a real problem
     // from a timing artefact - the biggest single source of false bug reports.
     if (!this.config.policy.retryFailedOnce) {
@@ -992,7 +996,7 @@ export class RunPipelineService {
     });
   }
 
-  // ============================================================ persistence
+  // Persistence
 
   private async persistResult(
     runId: string,
@@ -1171,7 +1175,7 @@ export class RunPipelineService {
       },
     });
 
-    // ------------------------------------------------- LLM call #2: triage
+    // LLM call #2: triage
     const steps = readJson<StepResult[]>(result.stepResults, []).map((s, i) => ({
       index: s.index ?? i,
       action: s.action ?? '',
@@ -1640,7 +1644,9 @@ function buildFailureList(
       last.expected && last.actual
         ? `Expected ${last.expected}, but got ${last.actual}.`
         : last.errorMessage?.trim() ||
-          (last.errorType ? `${last.errorType} — no further detail was captured.` : 'The test did not complete.');
+          (last.errorType
+            ? `${last.errorType} — no further detail was captured.`
+            : 'The test did not complete.');
 
     const evidence = [
       ...last.consoleLogs.map((c) => `console: ${c.message.slice(0, 160)}`),

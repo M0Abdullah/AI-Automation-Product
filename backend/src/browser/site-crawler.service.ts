@@ -134,9 +134,7 @@ export class SiteCrawlerService {
 
     // The entry page is page 1 unconditionally. It is what the user asked for,
     // so it is never dropped by a filter meant for discovered links.
-    const frontier: DiscoveredPage[] = [
-      { url: entry, path: pathOf(entry), title: '', depth: 0 },
-    ];
+    const frontier: DiscoveredPage[] = [{ url: entry, path: pathOf(entry), title: '', depth: 0 }];
 
     const context = await this.browsers.newContext(options.storageState);
     let truncated = false;
@@ -171,7 +169,8 @@ export class SiteCrawlerService {
             // rejected link on every page and a 200-line "skipped" list is noise.
             if (!seen.has(candidate.url)) {
               seen.add(candidate.url);
-              if (skipped.length < 40) skipped.push({ url: candidate.url, reason: candidate.reason });
+              if (skipped.length < 40)
+                skipped.push({ url: candidate.url, reason: candidate.reason });
             }
             continue;
           }
@@ -261,7 +260,11 @@ export class SiteCrawlerService {
     }
 
     if (absolute.protocol !== 'http:' && absolute.protocol !== 'https:') {
-      return { ok: false, url: absolute.href.slice(0, 200), reason: `Not a web page (${absolute.protocol})` };
+      return {
+        ok: false,
+        url: absolute.href.slice(0, 200),
+        reason: `Not a web page (${absolute.protocol})`,
+      };
     }
 
     const url = normaliseUrl(absolute.href);
@@ -283,10 +286,9 @@ export class SiteCrawlerService {
       return {
         ok: false,
         url,
-        reason:
-          banned.includes('out')
-            ? 'Signing out would destroy the run\'s session'
-            : `Looks destructive ("${banned}")`,
+        reason: banned.includes('out')
+          ? "Signing out would destroy the run's session"
+          : `Looks destructive ("${banned}")`,
       };
     }
 

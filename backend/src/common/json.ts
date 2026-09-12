@@ -61,5 +61,5 @@ export function writeJson(value: unknown): JsonIn {
  * duplicate-key error, while omitting it is not.
  */
 export function writeJsonNullable(value: unknown): JsonIn | undefined {
-  return value === undefined || value === null ? undefined : (value as JsonIn);
+  return value === undefined || value === null ? undefined : value;
 }

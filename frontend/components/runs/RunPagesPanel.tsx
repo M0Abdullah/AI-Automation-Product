@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { getRunPage } from '../lib/api';
-import type { RunPage, RunPageDetail, RunPageStatus } from '../lib/types';
-import { PageScanPanel } from './PageScanPanel';
+import { getRunPage } from '@/lib/api';
+import type { RunPage, RunPageDetail, RunPageStatus } from '@/lib/types';
+import { PageScanPanel } from '@/components/runs/PageScanPanel';
 
 /**
  * EVERY PAGE THE RUN COVERS, and what happened to each.
@@ -104,9 +104,7 @@ export function RunPagesPanel({
             {failed.length > 0
               ? `${failed.length} could not be tested — no tests exist for ${
                   failed.length === 1 ? 'it' : 'them'
-                }, so nothing here says whether ${
-                  failed.length === 1 ? 'it works' : 'they work'
-                }.`
+                }, so nothing here says whether ${failed.length === 1 ? 'it works' : 'they work'}.`
               : 'Every page was read and planned.'}
           </div>
         </div>
@@ -125,10 +123,13 @@ export function RunPagesPanel({
       )}
 
       {showSkipped && skipped && (
-        <div className="card card-tight" style={{ marginBottom: 10, background: 'var(--surface-2)' }}>
+        <div
+          className="card card-tight"
+          style={{ marginBottom: 10, background: 'var(--surface-2)' }}
+        >
           <div className="faint" style={{ marginBottom: 6 }}>
-            Links found and deliberately not followed. Nothing is dropped silently — this is
-            the answer to &ldquo;why is that page missing from my run&rdquo;.
+            Links found and deliberately not followed. Nothing is dropped silently — this is the
+            answer to &ldquo;why is that page missing from my run&rdquo;.
           </div>
           <table className="data">
             <tbody>

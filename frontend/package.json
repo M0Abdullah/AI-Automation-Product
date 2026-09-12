@@ -7,8 +7,11 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
-    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/kill-ports.ps1"
+    "lint": "eslint .",
+    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/kill-ports.ps1",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"components/**/*.tsx\" \"lib/*.ts\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"components/**/*.tsx\" \"lib/*.ts\""
   },
   "dependencies": {
     "next": "^15.1.0",
@@ -16,9 +19,14 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.25",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
     "typescript": "^5.7.0"
   },
   "license": "UNLICENSED"

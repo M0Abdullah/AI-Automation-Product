@@ -451,6 +451,8 @@ npm run check:browser -- https://your-site.com/login
 |---|---|
 | `.\scripts\kill-ports.ps1` | Frees ports 3000/4000 and kills stray watch processes |
 | `.\scripts\release.ps1 -Version x.y.z` | Checks, bumps and pushes. CI publishes the release — see [Releasing](#-releasing) |
+| `npm run lint` / `lint:fix` | ESLint, in both apps |
+| `npm run format` / `format:check` | Prettier, in both apps |
 | `npm run check:llm` | Verifies the LLM key, lists usable model ids |
 | `npm run check:browser -- <url>` | Verifies Chrome, previews a page scan |
 | `npm run set:owner -- --to a@b.com` | Changes an account's email / promotes it to owner |
@@ -596,6 +598,7 @@ Test passwords are encrypted with **AES-256-GCM**. The AI only ever writes `test
 | Database | MongoDB + Prisma | Native `Json` and arrays, so the AI's steps and assertions are stored as documents rather than encoded text |
 | AI | Groq / any OpenAI-compatible API | Free tier; one env var switches provider |
 | Auth | JWT + scrypt | No native dependency; every action attributed to a person |
+| Lint / format | ESLint 9 flat config + Prettier | Enforced in CI, so the style argument happens once |
 | Email | Nodemailer over SMTP | Works with Gmail, Office 365 or your own relay — no vendor lock-in |
 
 Playwright needs **no API key** — it's a library, not a service. The LLM key is the only secret in the project.
@@ -608,6 +611,7 @@ Playwright needs **no API key** — it's a library, not a service. The LLM key i
 ├── backend/                       NestJS API + Playwright worker
 │   ├── prisma/schema.prisma       the data model
 │   ├── scripts/                   check:llm, check:browser, set:owner
+│   ├── eslint.config.mjs
 │   └── src/
 │       ├── auth/                  accounts, JWT, scrypt, global guard
 │       ├── llm/                   THE BRAIN — prompts, JSON schemas, provider
@@ -615,20 +619,43 @@ Playwright needs **no API key** — it's a library, not a service. The LLM key i
 │       ├── policy/                THE SAFETY GATE
 │       ├── runs/                  run-pipeline.service.ts = the whole flow
 │       ├── findings/              triage: confirm / reject / reopen
+│       ├── content-issues/        promote a wording suggestion to a bug
+│       ├── design-issues/         promote a design mismatch to a bug
+│       ├── test-cases/            edit and re-run individual cases
+│       ├── results/ · artifacts/  outcomes, and the screenshots they point at
 │       ├── mail/                  notifications + HTML email templates
+│       ├── system/                health, capabilities, integrations
 │       └── common/                the action/assertion contract, check catalogue
 │
 ├── frontend/                      Next.js dashboard
 │   ├── app/                       dashboard, runs/new, runs/[id], findings
-│   ├── components/                RunForm, CheckPicker, TestCaseCard, FindingCard…
-│   └── lib/api.ts                 the only file that calls the backend
+│   ├── components/
+│   │   ├── ui/                    Icons, StatusBadge, ThemeToggle
+│   │   ├── layout/                AppShell, AuthProvider
+│   │   ├── runs/                  RunForm, CheckPicker, TestCaseCard, panels
+│   │   ├── evidence/              ScreenshotPanel, ResultEvidence, StepTimeline
+│   │   ├── findings/              FindingCard
+│   │   └── account/               IntegrationsPanel
+│   ├── lib/api.ts                 the only file that calls the backend
+│   └── eslint.config.mjs
 │
 ├── docs/                          ARCHITECTURE.md, API.md, screenshots/
 ├── scripts/                       repo-level ops: kill-ports, release, mongo setup
-├── .github/workflows/ci.yml       build + secret scan, then release on a version bump
+├── .github/workflows/ci.yml       lint, format, build, secret scan, then release
 ├── artifacts/                     run evidence at runtime — gitignored, not source
+├── .prettierrc.json               one format config, both apps
+├── .gitattributes                 LF in the repo, CRLF only for .ps1
 └── docker-compose.yml             the single-node MongoDB replica set
 ```
+
+Every module is a folder, and every folder is one responsibility — `content-issues/` and
+`design-issues/` are their own modules rather than extra controllers inside `runs/`, because a
+controller's folder should be findable from its route.
+
+Frontend components are grouped by **where they are used**, not by what they are, so a change to
+the run page touches one folder. Imports go through the `@/` alias — `@/components/runs/RunForm`
+rather than `../../../components/RunForm`, which stops being readable at the second `../` and
+breaks silently the moment a file moves.
 
 Two `scripts/` folders, deliberately: [`scripts/`](scripts/) holds PowerShell you run *on the
 repo* (free the ports, cut a release, configure mongod), while
@@ -801,7 +828,7 @@ is written as sequential awaits instead. Each step is independently safe.
 | [docs/API.md](docs/API.md) | Every endpoint with request/response examples |
 | [backend/.env.example](backend/.env.example) | Every setting, annotated |
 | [backend/prisma/schema.prisma](backend/prisma/schema.prisma) | The MongoDB data model |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Build, secret scan, and the release-on-push job |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Lint, format, build, secret scan, and the release-on-push job |
 | [CHANGELOG.md](CHANGELOG.md) | What changed in each version — and the source of every release note |
 
 ---

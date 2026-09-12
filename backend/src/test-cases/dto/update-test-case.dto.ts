@@ -12,7 +12,7 @@ import {
 import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from '../../common/test-plan.types';
 
 export class StepDto {
-  @IsIn(ALLOWED_ACTIONS as unknown as string[])
+  @IsIn(ALLOWED_ACTIONS)
   action!: string;
 
   @IsString()
@@ -36,7 +36,7 @@ export class StepDto {
 }
 
 export class AssertionDto {
-  @IsIn(ALLOWED_ASSERTIONS as unknown as string[])
+  @IsIn(ALLOWED_ASSERTIONS)
   type!: string;
 
   @IsOptional()

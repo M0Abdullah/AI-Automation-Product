@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { promoteContentIssue, reviewContentIssue } from '../lib/api';
-import type { ContentIssue, ContentIssueKind } from '../lib/types';
+import { promoteContentIssue, reviewContentIssue } from '@/lib/api';
+import type { ContentIssue, ContentIssueKind } from '@/lib/types';
 
 /**
  * The wording review list.
@@ -87,8 +87,8 @@ export function ContentIssuesPanel({
       <div className="empty">
         <strong>No wording problems found.</strong>
         <div className="faint">
-          The AI read the page text and did not spot typos, grammar issues or leftover
-          placeholder content.
+          The AI read the page text and did not spot typos, grammar issues or leftover placeholder
+          content.
         </div>
       </div>
     );
@@ -102,8 +102,8 @@ export function ContentIssuesPanel({
             {open.length} wording {open.length === 1 ? 'suggestion' : 'suggestions'}
           </strong>
           <div className="faint">
-            The AI never turns these into bugs by itself &mdash; you decide. Raise the real
-            ones, dismiss anything that is a brand name or industry term.
+            The AI never turns these into bugs by itself &mdash; you decide. Raise the real ones,
+            dismiss anything that is a brand name or industry term.
           </div>
         </div>
         {dismissed.length > 0 && (
@@ -113,18 +113,18 @@ export function ContentIssuesPanel({
         )}
       </div>
 
-      {error && <div className="banner banner-error" style={{ marginBottom: 8 }}>{error}</div>}
+      {error && (
+        <div className="banner banner-error" style={{ marginBottom: 8 }}>
+          {error}
+        </div>
+      )}
 
       <div className="stack">
         {visible.map((i) => {
           const status = statusOf(i);
           const isDismissed = status === 'DISMISSED';
           return (
-            <div
-              key={i.id}
-              className="card card-tight"
-              style={{ opacity: isDismissed ? 0.5 : 1 }}
-            >
+            <div key={i.id} className="card card-tight" style={{ opacity: isDismissed ? 0.5 : 1 }}>
               <div className="spread">
                 <div style={{ minWidth: 0 }}>
                   <div className="row" style={{ marginBottom: 4 }}>
@@ -142,9 +142,7 @@ export function ContentIssuesPanel({
                         low confidence
                       </span>
                     )}
-                    {status === 'ACCEPTED' && (
-                      <span className="badge badge-fail">Confirmed</span>
-                    )}
+                    {status === 'ACCEPTED' && <span className="badge badge-fail">Confirmed</span>}
                   </div>
 
                   {/* On the page vs suggested. Showing both is the whole value:

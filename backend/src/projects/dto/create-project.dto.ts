@@ -5,6 +5,9 @@ export class CreateProjectDto {
   @Length(2, 100)
   name!: string;
 
-  @IsUrl({ require_tld: false, require_protocol: true }, { message: 'baseUrl must include http:// or https://' })
+  @IsUrl(
+    { require_tld: false, require_protocol: true },
+    { message: 'baseUrl must include http:// or https://' },
+  )
   baseUrl!: string;
 }

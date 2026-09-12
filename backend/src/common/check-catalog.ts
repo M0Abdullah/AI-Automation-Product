@@ -31,7 +31,7 @@ export interface CheckDefinition {
 }
 
 export const CHECK_CATALOG: CheckDefinition[] = [
-  // ------------------------------------------------------------------ basics
+  // Basics
   {
     id: 'page_loads',
     label: 'Page loads correctly',
@@ -73,7 +73,7 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'HEADINGS in PAGE SCAN. Do not assert more than four elements in one case.',
   },
 
-  // ------------------------------------------------------------------- forms
+  // Forms
   {
     id: 'fields_accept_input',
     label: 'Fields accept typing',
@@ -108,7 +108,7 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'entirely if no email field exists.',
   },
 
-  // -------------------------------------------------------------- navigation
+  // Navigation
   {
     id: 'links_work',
     label: 'Links go to the right place',
@@ -130,7 +130,7 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'asserts noConsoleErrors. Never pick a button whose text suggests delete, pay or send.',
   },
 
-  // ------------------------------------------------------------------- login
+  // Login
   {
     id: 'login_success',
     label: 'Login works',
@@ -158,7 +158,7 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'specific error wording if the REQUIREMENTS state it.',
   },
 
-  // --------------------------------------------------- data & loading states
+  // Data & loading states
   {
     id: 'no_stuck_loader',
     label: 'Loading finishes properly',
@@ -184,7 +184,7 @@ export const CHECK_CATALOG: CheckDefinition[] = [
       'path. Optionally set target to the element that should show it. Do NOT guess field ' +
       'names that have no basis in the scan or the requirement - a wrong field name produces ' +
       'a useless failure. If you cannot identify a real field, skip this check entirely.',
-  }
+  },
 ];
 
 const BY_ID = new Map(CHECK_CATALOG.map((c) => [c.id, c]));
@@ -225,9 +225,8 @@ export function checksForPage(args: {
   // A password field is proof. The URL and title are corroboration for the apps
   // that render the field late or hide it behind a "continue" step.
   const looksLikeSignIn =
-    hasPasswordField || /(^|[^a-z])(login|log-in|signin|sign-in|auth)([^a-z]|$)/i.test(
-      `${url} ${title}`,
-    );
+    hasPasswordField ||
+    /(^|[^a-z])(login|log-in|signin|sign-in|auth)([^a-z]|$)/i.test(`${url} ${title}`);
 
   return checks.filter((c) => {
     // A credential-dependent check with no credentials would ask the model to

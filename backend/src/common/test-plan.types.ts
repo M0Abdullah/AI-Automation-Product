@@ -38,7 +38,7 @@ export const ALLOWED_ASSERTIONS = [
   'elementCountAtLeast',
   'noConsoleErrors', // no console error was logged during the test
   'noApiErrors', // no xhr/fetch request returned 4xx/5xx
-  // --- added for the second round of checks (loading + server data) ---
+  // Added for the second round of checks (loading + server data)
   'noStuckLoader', // no spinner / skeleton is still on screen once the page settled
   'apiDataRendered', // a value the API returned actually appears on the page
 ] as const;
@@ -95,19 +95,21 @@ export const ASSERTION_REQUIREMENTS: Record<
 };
 
 /** What kind of element the action targets — drives the locator strategy. */
-export const ACTION_TARGET_KIND: Record<ActionName, 'field' | 'clickable' | 'text' | 'url' | 'key'> =
-  {
-    goto: 'url',
-    click: 'clickable',
-    fill: 'field',
-    select: 'field',
-    check: 'field',
-    uncheck: 'field',
-    press: 'key',
-    hover: 'clickable',
-    waitForUrl: 'url',
-    waitForVisible: 'text',
-  };
+export const ACTION_TARGET_KIND: Record<
+  ActionName,
+  'field' | 'clickable' | 'text' | 'url' | 'key'
+> = {
+  goto: 'url',
+  click: 'clickable',
+  fill: 'field',
+  select: 'field',
+  check: 'field',
+  uncheck: 'field',
+  press: 'key',
+  hover: 'clickable',
+  waitForUrl: 'url',
+  waitForVisible: 'text',
+};
 
 export interface TestStep {
   action: ActionName;

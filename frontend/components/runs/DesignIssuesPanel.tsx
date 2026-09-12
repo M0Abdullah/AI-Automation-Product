@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { promoteDesignIssue, reviewDesignIssue } from '../lib/api';
-import type { DesignIssue, DesignIssueGroup } from '../lib/types';
+import { promoteDesignIssue, reviewDesignIssue } from '@/lib/api';
+import type { DesignIssue, DesignIssueGroup } from '@/lib/types';
 
 /**
  * Places the live page disagrees with the Figma design.
@@ -187,16 +187,16 @@ export function DesignIssuesPanel({
           </strong>
           <div className="faint">{summary}</div>
           <div className="faint" style={{ marginTop: 4 }}>
-            Only near-misses are reported. Something a pixel or a shade off a design value
-            is almost certainly meant to be that value; something far off is usually a
-            component the design does not cover, so it is left alone. Positions, arbitrary
-            widths and pixel diffing are still not checked.
+            Only near-misses are reported. Something a pixel or a shade off a design value is almost
+            certainly meant to be that value; something far off is usually a component the design
+            does not cover, so it is left alone. Positions, arbitrary widths and pixel diffing are
+            still not checked.
           </div>
           {pageUrl && (
             <div className="faint" style={{ marginTop: 4 }}>
               Compared against <span className="mono">{pageUrl}</span>. A Figma frame is one
-              screen&apos;s design, so this check stays on that page even when the run tests
-              the whole app.
+              screen&apos;s design, so this check stays on that page even when the run tests the
+              whole app.
             </div>
           )}
         </div>
@@ -230,18 +230,18 @@ export function DesignIssuesPanel({
         </div>
       )}
 
-      {error && <div className="banner banner-error" style={{ marginBottom: 8 }}>{error}</div>}
+      {error && (
+        <div className="banner banner-error" style={{ marginBottom: 8 }}>
+          {error}
+        </div>
+      )}
 
       <div className="stack">
         {visible.map((i) => {
           const status = statusOf(i);
           const isDismissed = status === 'DISMISSED';
           return (
-            <div
-              key={i.id}
-              className="card card-tight"
-              style={{ opacity: isDismissed ? 0.5 : 1 }}
-            >
+            <div key={i.id} className="card card-tight" style={{ opacity: isDismissed ? 0.5 : 1 }}>
               <div className="spread">
                 <div style={{ minWidth: 0 }}>
                   <div className="row" style={{ marginBottom: 4 }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CheckOption } from '../lib/types';
+import type { CheckOption } from '@/lib/types';
 
 /**
  * THE CHECKLIST.
@@ -30,17 +30,13 @@ export function CheckPicker({
 
   const setAll = (on: boolean) =>
     onChange(
-      on
-        ? options.filter((o) => !o.requiresCredentials || hasCredentials).map((o) => o.id)
-        : [],
+      on ? options.filter((o) => !o.requiresCredentials || hasCredentials).map((o) => o.id) : [],
     );
 
   return (
     <div>
       <div className="spread" style={{ marginBottom: 8 }}>
-        <span className="faint">
-          {selected.length} selected
-        </span>
+        <span className="faint">{selected.length} selected</span>
         <span className="row" style={{ gap: 4 }}>
           <button type="button" className="btn btn-sm btn-ghost" onClick={() => setAll(true)}>
             Select all

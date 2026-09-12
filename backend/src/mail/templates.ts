@@ -64,8 +64,7 @@ const PASS = '#4ade9b';
 const FAIL = '#ff7a9a';
 const WARN = '#f7c65a';
 
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 /** Escapes text so a page title containing `<` cannot break the email. */
 function esc(s: string): string {

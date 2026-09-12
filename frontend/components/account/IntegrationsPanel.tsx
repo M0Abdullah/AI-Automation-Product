@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getIntegrations, verifyMail } from '../lib/api';
-import type { IntegrationStatus } from '../lib/types';
+import { getIntegrations, verifyMail } from '@/lib/api';
+import type { IntegrationStatus } from '@/lib/types';
 
 /**
  * WHAT THIS INSTANCE IS CONNECTED TO, and whether it actually works.
@@ -80,7 +80,6 @@ export function IntegrationsPanel() {
       </div>
 
       <div className="stack-sm">
-        {/* -------------------------------------------------------- email */}
         <div className="integration-row">
           <div style={{ minWidth: 0, flex: 1 }}>
             <div className="row" style={{ marginBottom: 4, flexWrap: 'wrap' }}>
@@ -122,8 +121,8 @@ export function IntegrationsPanel() {
               <div className="banner banner-warn" style={{ marginTop: 8, display: 'block' }}>
                 <strong>Links in these emails point at {m.appUrl}.</strong>
                 <div style={{ fontWeight: 400, marginTop: 2 }}>
-                  They will only work on this machine. Set <code>APP_PUBLIC_URL</code> to the address
-                  your team actually opens.
+                  They will only work on this machine. Set <code>APP_PUBLIC_URL</code> to the
+                  address your team actually opens.
                 </div>
               </div>
             )}

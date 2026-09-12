@@ -3,11 +3,7 @@ import { AppConfigService } from '../config/app-config.service';
 import type { PageSnapshot } from '../browser/browser.types';
 import type { CheckDefinition } from '../common/check-catalog';
 import type { TestCasePlan } from '../common/test-plan.types';
-import {
-  LLM_PROVIDER,
-  LlmProvider,
-  LlmProviderError,
-} from './providers/llm-provider.interface';
+import { LLM_PROVIDER, LlmProvider, LlmProviderError } from './providers/llm-provider.interface';
 import {
   TEST_PLAN_JSON_SCHEMA,
   TestPlanResponse,
@@ -76,7 +72,7 @@ export class LlmService {
     const first = await this.provider.completeJson({
       systemPrompt: TEST_PLAN_SYSTEM_PROMPT,
       userPrompt,
-      jsonSchema: TEST_PLAN_JSON_SCHEMA as never,
+      jsonSchema: TEST_PLAN_JSON_SCHEMA,
     });
 
     let parsed = testPlanSchema.safeParse(first.raw);
@@ -85,13 +81,15 @@ export class LlmService {
     let latencyMs = first.latencyMs;
     let model = first.model;
 
-    // ------------------------------------------------------- self-repair pass
+    // Self-repair pass
     // Smaller models frequently nail the outer shape and get one nested field
     // wrong. Handing back the exact validation errors fixes most of those, and
     // is far cheaper than losing the run and regenerating from scratch.
     if (!parsed.success) {
       const issues = describeIssues(parsed.error.issues);
-      this.logger.warn(`Test plan failed validation, asking the model to repair: ${issues.join('; ')}`);
+      this.logger.warn(
+        `Test plan failed validation, asking the model to repair: ${issues.join('; ')}`,
+      );
 
       const repaired = await this.provider.completeJson({
         systemPrompt: TEST_PLAN_SYSTEM_PROMPT,
@@ -100,7 +98,7 @@ export class LlmService {
           invalidOutput: first.raw,
           issues,
         }),
-        jsonSchema: TEST_PLAN_JSON_SCHEMA as never,
+        jsonSchema: TEST_PLAN_JSON_SCHEMA,
       });
 
       parsed = testPlanSchema.safeParse(repaired.raw);
@@ -125,7 +123,7 @@ export class LlmService {
     );
 
     return {
-      cases: parsed.data.testCases as TestCasePlan[],
+      cases: parsed.data.testCases,
       untestable: parsed.data.untestable,
       questions: parsed.data.questions,
       meta: { model, tokensIn, tokensOut, latencyMs },
@@ -144,7 +142,7 @@ export class LlmService {
       const res = await this.provider.completeJson({
         systemPrompt: TRIAGE_SYSTEM_PROMPT,
         userPrompt: buildTriageUserPrompt(input),
-        jsonSchema: TRIAGE_JSON_SCHEMA as never,
+        jsonSchema: TRIAGE_JSON_SCHEMA,
         maxTokens: 2000,
       });
 
@@ -175,7 +173,7 @@ export class LlmService {
       const res = await this.provider.completeJson({
         systemPrompt: CONTENT_CHECK_SYSTEM_PROMPT,
         userPrompt: buildContentCheckUserPrompt(input),
-        jsonSchema: CONTENT_CHECK_JSON_SCHEMA as never,
+        jsonSchema: CONTENT_CHECK_JSON_SCHEMA,
         maxTokens: 2000,
       });
 

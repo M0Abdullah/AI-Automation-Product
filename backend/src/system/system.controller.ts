@@ -4,8 +4,8 @@ import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CHECK_CATALOG } from './check-catalog';
-import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from './test-plan.types';
+import { CHECK_CATALOG } from '../common/check-catalog';
+import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from '../common/test-plan.types';
 
 /**
  * Diagnostics. Hit /api/health first whenever something does not work - it

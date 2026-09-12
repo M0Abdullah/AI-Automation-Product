@@ -294,7 +294,7 @@ export class RunsService {
     }
 
     // Flip to RUNNING synchronously, BEFORE returning. The client reloads the
-    // run the moment this responds; if the status were still AWAITING_APPROVAL
+    // run the moment this responds; if the status were still COMPLETED
     // it would conclude nothing is happening and stop polling, and the page
     // would look frozen for the whole run.
     await this.prisma.run.update({
@@ -452,9 +452,8 @@ function summarise(run: {
     failed: latestByCase.filter((s) => s === 'FAIL').length,
     errored: latestByCase.filter((s) => s === 'ERROR').length,
     flaky: latestByCase.filter((s) => s === 'FLAKY').length,
-    openFindings: run.findings.filter((f) =>
-      OPEN_FINDING_STATUSES.includes(f.status as never),
-    ).length,
+    openFindings: run.findings.filter((f) => OPEN_FINDING_STATUSES.includes(f.status as never))
+      .length,
     confirmedFindings: run.findings.filter((f) => f.status === 'CONFIRMED').length,
   };
 }

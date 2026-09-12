@@ -100,7 +100,13 @@ export class PolicyService {
         continue;
       }
 
-      const caseRejections = this.reviewCase(tc, i, allowedOrigin, allowUnsafe(tc, allowDestructive), maxStepsPerCase);
+      const caseRejections = this.reviewCase(
+        tc,
+        i,
+        allowedOrigin,
+        allowUnsafe(tc, allowDestructive),
+        maxStepsPerCase,
+      );
       if (caseRejections.length) {
         rejections.push(...caseRejections);
         continue;
@@ -166,10 +172,7 @@ export class PolicyService {
           payload: step,
         });
       }
-      if (
-        step.valueRef &&
-        !SecretsService.ALLOWED_VALUE_REFS.includes(step.valueRef as never)
-      ) {
+      if (step.valueRef && !SecretsService.ALLOWED_VALUE_REFS.includes(step.valueRef as never)) {
         out.push({
           stage: 'UNKNOWN_VALUE_REF',
           subject: where,

@@ -3,7 +3,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { BrowserFactory, type StorageState } from './browser.factory';
 import { EvidenceCollector } from './evidence-collector';
 import { waitForInteractiveContent } from './page-settle';
-import type { PageSnapshot, ScannedElement, ScannedForm } from './browser.types';
+import type { PageSnapshot, ScannedElement } from './browser.types';
 
 /**
  * STEP 1 OF THE PIPELINE: give the LLM eyes.
@@ -61,7 +61,7 @@ export class PageScannerService {
         httpStatus: response?.status() ?? null,
         headings: extracted.headings,
         elements: extracted.elements as unknown as ScannedElement[],
-        forms: extracted.forms as unknown as ScannedForm[],
+        forms: extracted.forms,
         visibleTextSample: extracted.visibleTextSample,
         contentTextSample: extracted.contentTextSample,
         consoleErrors: evidence.consoleErrorTexts.slice(0, 20),
@@ -84,7 +84,6 @@ export class PageScannerService {
       await context.close().catch(() => undefined);
     }
   }
-
 }
 
 /**
@@ -149,7 +148,7 @@ function extractPageStructure(maxElements: number) {
     elements.push(item);
   };
 
-  // --- inputs / textareas ---
+  // Inputs / textareas
   document.querySelectorAll('input, textarea').forEach((el) => {
     if (!isVisible(el)) return;
     const input = el as HTMLInputElement;
@@ -176,14 +175,14 @@ function extractPageStructure(maxElements: number) {
     });
   });
 
-  // --- selects ---
+  // Selects
   document.querySelectorAll('select').forEach((el) => {
     if (!isVisible(el)) return;
     const { label, source } = labelOf(el);
     add({
       kind: 'select',
       label,
-      options: Array.from((el as HTMLSelectElement).options)
+      options: Array.from(el.options)
         .slice(0, 20)
         .map((o) => o.label || o.value)
         .filter(Boolean),
@@ -191,18 +190,22 @@ function extractPageStructure(maxElements: number) {
     });
   });
 
-  // --- buttons (including submit inputs and role=button) ---
+  // Buttons (including submit inputs and role=button)
   document
     .querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')
     .forEach((el) => {
       if (!isVisible(el)) return;
       const asInput = el as HTMLInputElement;
       const label =
-        text(el) || asInput.value || el.getAttribute('aria-label') || el.getAttribute('title') || '';
+        text(el) ||
+        asInput.value ||
+        el.getAttribute('aria-label') ||
+        el.getAttribute('title') ||
+        '';
       add({ kind: 'button', label: label.replace(/\s+/g, ' ').trim(), labelSource: 'text' });
     });
 
-  // --- links ---
+  // Links
   document.querySelectorAll('a[href]').forEach((el) => {
     if (!isVisible(el)) return;
     const label = text(el) || el.getAttribute('aria-label') || '';
@@ -211,7 +214,7 @@ function extractPageStructure(maxElements: number) {
     add({ kind: 'link', label, href: href.slice(0, 300), labelSource: 'text' });
   });
 
-  // --- forms ---
+  // Forms
   const forms = Array.from(document.querySelectorAll('form'))
     .slice(0, 10)
     .map((f) => ({
@@ -223,7 +226,7 @@ function extractPageStructure(maxElements: number) {
         .slice(0, 25),
     }));
 
-  // --- headings ---
+  // Headings
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .filter(isVisible)
     .map((h) => text(h))

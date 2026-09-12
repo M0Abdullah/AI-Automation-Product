@@ -8,17 +8,17 @@ import {
   reopenFinding,
   retestTestCase,
   triageFinding,
-} from '../lib/api';
-import type { Finding } from '../lib/types';
-import { useAuth } from './AuthProvider';
-import { ResultEvidence } from './ResultEvidence';
-import { ScreenshotPanel } from './ScreenshotPanel';
+} from '@/lib/api';
+import type { Finding } from '@/lib/types';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { ResultEvidence } from '@/components/evidence/ResultEvidence';
+import { ScreenshotPanel } from '@/components/evidence/ScreenshotPanel';
 import {
   CategoryBadge,
   ClassificationBadge,
   FindingStatusBadge,
   PriorityBadge,
-} from './StatusBadge';
+} from '@/components/ui/StatusBadge';
 
 /**
  * THE QA WORKFLOW, ON SCREEN.
@@ -51,13 +51,7 @@ const SEVERITIES = [
   { value: 'S4_TRIVIAL', label: 'S4 - Trivial' },
 ];
 
-export function FindingCard({
-  finding,
-  onChanged,
-}: {
-  finding: Finding;
-  onChanged: () => void;
-}) {
+export function FindingCard({ finding, onChanged }: { finding: Finding; onChanged: () => void }) {
   const { canWrite, user } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +62,7 @@ export function FindingCard({
   // the moment the defect is confirmed rather than filled in later.
   const [module, setModule] = useState(finding.module ?? '');
   const [build, setBuild] = useState(finding.build ?? '');
-  const [priority, setPriority] = useState(
-    finding.priority ?? finding.testCase.priority ?? 'P2',
-  );
+  const [priority, setPriority] = useState(finding.priority ?? finding.testCase.priority ?? 'P2');
 
   // Pre-select the AI's suggestion so the common case is one click - but the
   // human still has to press the button.
@@ -150,11 +142,17 @@ export function FindingCard({
         </div>
       </div>
 
-      {error && <div className="banner banner-error" style={{ marginBottom: 10 }}>{error}</div>}
+      {error && (
+        <div className="banner banner-error" style={{ marginBottom: 10 }}>
+          {error}
+        </div>
+      )}
 
-      {/* --------------------------------------------- the AI suggestion box */}
       {(finding.aiSummary || finding.aiClassification) && (
-        <div className="card card-tight" style={{ background: 'var(--surface-2)', marginBottom: 10 }}>
+        <div
+          className="card card-tight"
+          style={{ background: 'var(--surface-2)', marginBottom: 10 }}
+        >
           <div className="row" style={{ marginBottom: 5 }}>
             <ClassificationBadge
               value={finding.aiClassification}
@@ -197,7 +195,6 @@ export function FindingCard({
         </div>
       )}
 
-      {/* -------------------------------------------------- the QA decision */}
       <div className="row">
         {open && !showTriage && canWrite && (
           <button className="btn btn-sm btn-primary" onClick={() => setShowTriage(true)}>
@@ -219,7 +216,10 @@ export function FindingCard({
             disabled={busy !== null}
             onClick={() =>
               act('reopen', () =>
-                reopenFinding(finding.id, window.prompt('Why are you reopening this?') ?? undefined),
+                reopenFinding(
+                  finding.id,
+                  window.prompt('Why are you reopening this?') ?? undefined,
+                ),
               )
             }
           >
@@ -365,7 +365,6 @@ export function FindingCard({
         </div>
       )}
 
-      {/* ------------------------------------------------------ audit trail */}
       <details className="collapse" style={{ marginTop: 10 }}>
         <summary>History ({finding.events.length})</summary>
         <table className="data">

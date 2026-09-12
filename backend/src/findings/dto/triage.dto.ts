@@ -12,7 +12,7 @@ export class TriageFindingDto {
   decision!: 'CONFIRM' | 'REJECT';
 
   /** Required on REJECT so the reason is recorded, not lost. */
-  @IsIn(CLASSIFICATIONS as unknown as string[])
+  @IsIn(CLASSIFICATIONS)
   classification!: string;
 
   @IsOptional()

@@ -1,6 +1,6 @@
 'use client';
 
-import { RunForm } from '../../../components/RunForm';
+import { RunForm } from '@/components/runs/RunForm';
 
 /**
  * The new-run screen. Split out from the dashboard so the landing page can be an
@@ -14,8 +14,8 @@ export default function NewRunPage() {
         <span className="eyebrow">New test run</span>
         <h1>What should we test?</h1>
         <p className="page-subtitle">
-          Add one authorised page. We&apos;ll inspect it, propose safe test cases, and wait for
-          your approval before Chrome runs anything.
+          Add one authorised page. We&apos;ll inspect it, propose safe test cases, and wait for your
+          approval before Chrome runs anything.
         </p>
       </div>
       <div className="composer-wrap">

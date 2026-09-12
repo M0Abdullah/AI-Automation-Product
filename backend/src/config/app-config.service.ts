@@ -18,7 +18,7 @@ export class AppConfigService {
     return this.config.get(key, { infer: true });
   }
 
-  // --- server ---
+  // Server
   get nodeEnv() {
     return this.get('NODE_ENV');
   }
@@ -36,7 +36,7 @@ export class AppConfigService {
     return this.get('PUBLIC_API_URL').replace(/\/$/, '');
   }
 
-  // --- llm ---
+  // Llm
   /**
    * Figma is optional. `enabled` is what callers should check - it keeps the
    * "is the integration configured" question in one place instead of every call
@@ -63,12 +63,12 @@ export class AppConfigService {
     };
   }
 
-  // --- secrets ---
+  // Secrets
   get secretsEncryptionKey() {
     return Buffer.from(this.get('SECRETS_ENCRYPTION_KEY'), 'hex');
   }
 
-  // --- browser worker ---
+  // Browser worker
   get auth() {
     return {
       jwtSecret: this.get('JWT_SECRET'),
@@ -97,7 +97,7 @@ export class AppConfigService {
     };
   }
 
-  // --- evidence ---
+  // Evidence
   /** Absolute path on disk where screenshots and traces are written. */
   get artifactsDir() {
     const configured = this.get('ARTIFACTS_DIR');
@@ -107,7 +107,7 @@ export class AppConfigService {
     return this.get('CAPTURE_TRACE_ON_FAILURE');
   }
 
-  // --- execution policy ---
+  // Execution policy
   get policy() {
     return {
       retryFailedOnce: this.get('RETRY_FAILED_ONCE'),
@@ -118,7 +118,7 @@ export class AppConfigService {
     };
   }
 
-  // --- email ---
+  // Email
   /**
    * `enabled` is the only thing callers should test. It folds together the
    * switch and the two settings without which sending is impossible, so no
@@ -144,7 +144,7 @@ export class AppConfigService {
     };
   }
 
-  // --- whole-app crawl ---
+  // Whole-app crawl
   /**
    * The hard ceilings are separate from the defaults on purpose: the defaults
    * are a starting point the user may change per run, the hard values are what

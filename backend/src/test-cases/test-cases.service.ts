@@ -8,11 +8,16 @@ import { RunPipelineService } from '../runs/run-pipeline.service';
 import { RejectTestCaseDto, UpdateTestCaseDto } from './dto/update-test-case.dto';
 
 /**
- * PHASE D: HUMAN REVIEW.
+ * EDITING A PLAN THE PIPELINE HAS ALREADY WRITTEN.
  *
- * Nothing runs until a person approves it. This service is that gate, plus the
- * editor behind it. Human edits are re-validated by the same policy engine that
- * validated the model - the gate does not open just because a human typed it.
+ * A run no longer stops for approval, so nothing here is on the critical path:
+ * cases arrive approved and execute on their own. What this service exists for
+ * is the correction afterwards - reword a case, fix a locator the scan got
+ * wrong, exclude one that is testing the wrong thing, then re-run.
+ *
+ * Human edits are re-validated by the same policy engine that validated the
+ * model. A person is trusted more than a model, but not trusted to type an
+ * action the executor cannot perform, or a target the policy forbids.
  */
 @Injectable()
 export class TestCasesService {
@@ -91,7 +96,7 @@ export class TestCasesService {
         steps: writeJson(steps),
         assertions: writeJson(assertions),
         // Any structural edit marks the case as human-authored, which is what
-        // makes "percentage of AI tests approved without edits" measurable.
+        // makes "percentage of AI tests that needed a fix" measurable.
         source: edited ? CaseSource.MANUAL : existing.source,
         approved: dto.approved ?? existing.approved,
         approvedAt: dto.approved ? new Date() : existing.approvedAt,

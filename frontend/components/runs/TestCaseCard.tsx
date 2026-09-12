@@ -7,12 +7,12 @@ import {
   rejectTestCase,
   retestTestCase,
   updateTestCase,
-} from '../lib/api';
-import type { TestCase } from '../lib/types';
-import { useAuth } from './AuthProvider';
-import { ResultEvidence } from './ResultEvidence';
-import { PriorityBadge, ResultStatusBadge } from './StatusBadge';
-import { PlannedSteps } from './StepTimeline';
+} from '@/lib/api';
+import type { TestCase } from '@/lib/types';
+import { useAuth } from '@/components/layout/AuthProvider';
+import { ResultEvidence } from '@/components/evidence/ResultEvidence';
+import { PriorityBadge, ResultStatusBadge } from '@/components/ui/StatusBadge';
+import { PlannedSteps } from '@/components/evidence/StepTimeline';
 
 /**
  * ONE TEST, AS ONE LINE.
@@ -100,7 +100,6 @@ export function TestCaseCard({
         opacity: testCase.rejected ? 0.6 : 1,
       }}
     >
-      {/* ------------------------------------------------------- the one line */}
       <div className="spread" style={{ gap: 10 }}>
         <button
           type="button"
@@ -174,7 +173,6 @@ export function TestCaseCard({
         </div>
       </div>
 
-      {/* ------------------------ the failure reason, always visible if failed */}
       {failed && latest?.errorMessage && (
         <div
           className="faint"
@@ -199,7 +197,6 @@ export function TestCaseCard({
         </div>
       )}
 
-      {/* ------------------------------------------------------- the detail */}
       {open && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
           {testCase.requirement && (

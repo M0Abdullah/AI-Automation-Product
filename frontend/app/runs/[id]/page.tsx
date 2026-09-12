@@ -3,21 +3,15 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { ContentIssuesPanel } from '../../../components/ContentIssuesPanel';
-import { DesignIssuesPanel } from '../../../components/DesignIssuesPanel';
-import { FindingCard } from '../../../components/FindingCard';
-import { PageScanPanel } from '../../../components/PageScanPanel';
-import { RunStatusBadge } from '../../../components/StatusBadge';
-import { TestCaseCard } from '../../../components/TestCaseCard';
-import { RunPagesPanel } from '../../../components/RunPagesPanel';
-import {
-  ApiError,
-  POLL_INTERVAL_MS,
-  executeRun,
-  getRun,
-  replanRun,
-} from '../../../lib/api';
-import { IN_PROGRESS_STATUSES, type RunDetail } from '../../../lib/types';
+import { ContentIssuesPanel } from '@/components/runs/ContentIssuesPanel';
+import { DesignIssuesPanel } from '@/components/runs/DesignIssuesPanel';
+import { FindingCard } from '@/components/findings/FindingCard';
+import { PageScanPanel } from '@/components/runs/PageScanPanel';
+import { RunStatusBadge } from '@/components/ui/StatusBadge';
+import { TestCaseCard } from '@/components/runs/TestCaseCard';
+import { RunPagesPanel } from '@/components/runs/RunPagesPanel';
+import { ApiError, POLL_INTERVAL_MS, executeRun, getRun, replanRun } from '@/lib/api';
+import { IN_PROGRESS_STATUSES, type RunDetail } from '@/lib/types';
 
 /**
  * THE RUN PAGE.
@@ -137,7 +131,6 @@ export default function RunPage() {
 
   return (
     <div className="stack">
-      {/* ============================================================ header */}
       <div className="card">
         <div className="spread">
           <div style={{ minWidth: 0 }}>
@@ -184,7 +177,6 @@ export default function RunPage() {
           </div>
         )}
 
-        {/* --------------------------------------- ONE line: what's going on */}
         <div style={{ marginTop: 16 }}>
           {inProgress ? (
             <div className="banner banner-info" style={{ display: 'block' }}>
@@ -272,7 +264,6 @@ export default function RunPage() {
           )}
         </div>
 
-        {/* -------------------------------- ONE result line, not eight boxes */}
         {hasRun && (
           <div className="result-line">
             <ResultChip label="passed" value={s.passed} tone="pass" />
@@ -286,7 +277,6 @@ export default function RunPage() {
         )}
       </div>
 
-      {/* ============================================================== tabs */}
       <div className="tabs">
         <TabButton current={tab} id="cases" onClick={setTab} count={run.testCases.length}>
           Tests
@@ -324,7 +314,6 @@ export default function RunPage() {
         </TabButton>
       </div>
 
-      {/* ------------------------------------------------------------- tests */}
       {tab === 'cases' && (
         <div className="stack-sm">
           {run.testCases.length === 0 ? (
@@ -360,9 +349,7 @@ export default function RunPage() {
               </div>
             ))
           ) : (
-            run.testCases.map((tc) => (
-              <TestCaseCard key={tc.id} testCase={tc} onChanged={load} />
-            ))
+            run.testCases.map((tc) => <TestCaseCard key={tc.id} testCase={tc} onChanged={load} />)
           )}
 
           {/* The honest caveat, on the tab where approval happens. */}
@@ -373,8 +360,8 @@ export default function RunPage() {
                   {pagesFailed} of {pages.length} pages have no tests.
                 </strong>
                 <div style={{ fontWeight: 400, marginTop: 2 }}>
-                  A green result below says nothing about {pagesFailed === 1 ? 'it' : 'them'}.
-                  Open the <strong>Pages</strong> tab for the reason against each one.
+                  A green result below says nothing about {pagesFailed === 1 ? 'it' : 'them'}. Open
+                  the <strong>Pages</strong> tab for the reason against each one.
                 </div>
               </div>
             </div>
@@ -382,14 +369,12 @@ export default function RunPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- pages */}
       {tab === 'pages' && (
         <div className="card">
           <RunPagesPanel runId={run.id} pages={pages} skipped={crawlSkipped} />
         </div>
       )}
 
-      {/* ---------------------------------------------------------- failures */}
       {tab === 'failures' && (
         <div className="stack-sm">
           {run.findings.length === 0 ? (
@@ -403,7 +388,6 @@ export default function RunPage() {
         </div>
       )}
 
-      {/* ----------------------------------------------------------- wording */}
       {tab === 'wording' && (
         <div className="card">
           <ContentIssuesPanel
@@ -414,7 +398,6 @@ export default function RunPage() {
         </div>
       )}
 
-      {/* ------------------------------------------------------------ design */}
       {tab === 'design' && (
         <div className="card">
           <DesignIssuesPanel
@@ -428,7 +411,6 @@ export default function RunPage() {
         </div>
       )}
 
-      {/* ----------------------------------------------------------- details */}
       {tab === 'details' && (
         <div className="stack">
           <div className="card">
@@ -449,7 +431,10 @@ export default function RunPage() {
                 which is the difference between a real result and a page of
                 assertions about a login screen. */}
             {run.loginUrl && (
-              <div className="card card-tight" style={{ marginTop: 12, background: 'var(--surface-2)' }}>
+              <div
+                className="card card-tight"
+                style={{ marginTop: 12, background: 'var(--surface-2)' }}
+              >
                 <div className="row" style={{ marginBottom: 4 }}>
                   <span className="badge badge-pass">Signed in first</span>
                   <span className="mono faint">{run.loginUrl}</span>
@@ -637,9 +622,9 @@ function groupByPage(
     .sort((a, b) => (order.get(a[0]) ?? 999) - (order.get(b[0]) ?? 999))
     .map(([id, list]) => {
       const page = pages.find((p) => p.id === id);
-      return [
-        { key: id, path: page?.path ?? 'Other tests', title: page?.title },
-        list,
-      ] as [{ key: string; path: string; title?: string | null }, RunDetail['testCases']];
+      return [{ key: id, path: page?.path ?? 'Other tests', title: page?.title }, list] as [
+        { key: string; path: string; title?: string | null },
+        RunDetail['testCases'],
+      ];
     });
 }

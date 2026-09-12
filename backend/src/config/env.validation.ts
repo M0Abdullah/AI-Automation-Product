@@ -34,21 +34,21 @@ const int = (def: number, min = 0) =>
     .pipe(z.number().int().min(min));
 
 export const envSchema = z.object({
-  // --- server ---
+  // Server
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: int(4000, 1),
   CORS_ORIGINS: csv(['http://localhost:3000']),
-  // Where this API is reachable from OUTSIDE. Used to build absolute links in
-  // exported bug reports - a relative /api/artifacts path renders as a broken
-  // image once the Markdown is pasted into Jira or Slack.
+  // Where this API is reachable from OUTSIDE. Screenshot links in the result
+  // emails are built from it - a relative /api/artifacts path is a broken
+  // image in an inbox, which is the one place the link has to work.
   PUBLIC_API_URL: z.string().url().default('http://localhost:4000'),
 
-  // --- database ---
+  // Database
   // MongoDB connection string, e.g. mongodb://localhost:27017/aitest or an
   // Atlas mongodb+srv:// URL. Prisma needs the database name in the path.
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-  // --- llm ---
+  // Llm
   // groq and openai both speak the OpenAI-compatible protocol, so one
   // provider implementation covers both. Only the base URL differs.
   LLM_PROVIDER: z.enum(['groq', 'openai']).default('groq'),
@@ -63,14 +63,14 @@ export const envSchema = z.object({
     .pipe(z.number().min(0).max(2)),
   LLM_TIMEOUT_MS: int(90000, 5000),
 
-  // ------------------------------------------------------------------ FIGMA
+  // FIGMA
   // Optional: without a token the design comparison is simply unavailable and
   // every other check keeps working. A missing integration must never stop the
   // platform from booting.
   FIGMA_TOKEN: z.string().optional(),
   FIGMA_TIMEOUT_MS: int(20000, 3000),
 
-  // --- auth ---
+  // Auth
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   /// Access tokens are short-lived; the refresh token in the DB does the rest.
   JWT_ACCESS_TTL_MINUTES: int(60, 5),
@@ -78,12 +78,12 @@ export const envSchema = z.object({
   /// The first account to register becomes OWNER. Set false once set up.
   ALLOW_OPEN_REGISTRATION: bool(true),
 
-  // --- secrets ---
+  // Secrets
   SECRETS_ENCRYPTION_KEY: z
     .string()
     .regex(/^[0-9a-fA-F]{64}$/, 'SECRETS_ENCRYPTION_KEY must be 64 hex chars (32 bytes)'),
 
-  // --- browser worker ---
+  // Browser worker
   // 'chrome' drives your real installed Google Chrome; 'chromium' uses the
   // build Playwright downloaded. Chrome is closer to what users actually run
   // (codecs, PDF viewer, enterprise policies); chromium always exists.
@@ -105,11 +105,11 @@ export const envSchema = z.object({
   // renders field-by-field is captured whole rather than half-built.
   SCAN_SETTLE_GRACE_MS: int(700, 0),
 
-  // --- evidence ---
+  // Evidence
   ARTIFACTS_DIR: z.string().default('../artifacts'),
   CAPTURE_TRACE_ON_FAILURE: bool(true),
 
-  // --- execution policy ---
+  // Execution policy
   RETRY_FAILED_ONCE: bool(true),
   DESTRUCTIVE_KEYWORDS: csv([
     'delete',
@@ -133,7 +133,7 @@ export const envSchema = z.object({
   MAX_TEST_CASES_PER_PAGE: int(8, 1),
   MAX_STEPS_PER_CASE: int(25, 1),
 
-  // --- whole-app crawl ---
+  // Whole-app crawl
   // Defaults for a run that does not specify its own. The real cost is one
   // page scan plus one LLM call per page, so the ceilings are deliberately
   // modest - CRAWL_MAX_PAGES_HARD is the limit a user cannot raise from the UI.
@@ -142,7 +142,7 @@ export const envSchema = z.object({
   CRAWL_MAX_PAGES_HARD: int(50, 1),
   CRAWL_MAX_DEPTH_HARD: int(5, 1),
 
-  // --- email notifications -------------------------------------------------
+  // Email notifications
   // Off by default: the platform must run with no mail server at all.
   MAIL_ENABLED: bool(false),
   MAIL_HOST: z.string().default(''),

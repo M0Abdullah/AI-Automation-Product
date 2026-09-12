@@ -102,8 +102,7 @@ export class FindingsService {
    */
   async triage(id: string, dto: TriageFindingDto) {
     const finding = await this.get(id);
-    const target =
-      dto.decision === 'CONFIRM' ? FindingStatus.CONFIRMED : FindingStatus.REJECTED;
+    const target = dto.decision === 'CONFIRM' ? FindingStatus.CONFIRMED : FindingStatus.REJECTED;
     this.assertTransition(finding, target);
 
     // A confirmed defect earns a permanent, quotable id: BUG-007.
@@ -183,13 +182,7 @@ export class FindingsService {
   async comment(id: string, dto: FindingNoteDto) {
     const finding = await this.get(id);
     if (!dto.note?.trim()) throw new BadRequestException('A comment needs text.');
-    await this.event(
-      id,
-      finding.status,
-      finding.status as FindingStatus,
-      dto.actor,
-      dto.note,
-    );
+    await this.event(id, finding.status, finding.status as FindingStatus, dto.actor, dto.note);
     return this.findOne(id);
   }
 
@@ -212,7 +205,7 @@ export class FindingsService {
     return out;
   }
 
-  // ------------------------------------------------------------- internals
+  // Internals
 
   private async get(id: string): Promise<Finding> {
     const f = await this.prisma.finding.findUnique({ where: { id } });
@@ -230,13 +223,7 @@ export class FindingsService {
     }
   }
 
-  private event(
-    findingId: string,
-    from: string,
-    to: FindingStatus,
-    actor?: string,
-    note?: string,
-  ) {
+  private event(findingId: string, from: string, to: FindingStatus, actor?: string, note?: string) {
     return this.prisma.findingEvent.create({
       data: { findingId, fromStatus: from, toStatus: to, actor: actor ?? 'qa@local', note },
     });

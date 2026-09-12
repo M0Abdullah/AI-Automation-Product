@@ -237,7 +237,9 @@ export class SessionService {
         .catch(() => '');
       const isPassword = type === 'password';
       if (want === 'password' ? !isPassword : isPassword) {
-        skipped.push(`"${target}" matched a ${isPassword ? 'password' : type || 'non-password'} field`);
+        skipped.push(
+          `"${target}" matched a ${isPassword ? 'password' : type || 'non-password'} field`,
+        );
         continue;
       }
 
@@ -320,10 +322,7 @@ export class SessionService {
       attempts.push({
         label: `button named "${name}"`,
         run: async () => {
-          await page
-            .getByRole('button', { name, exact: false })
-            .first()
-            .click({ timeout: 2500 });
+          await page.getByRole('button', { name, exact: false }).first().click({ timeout: 2500 });
         },
       });
     }
@@ -410,7 +409,6 @@ export class SessionService {
       await page.waitForTimeout(250);
     }
   }
-
 }
 
 /** A trailing slash or a hash change is not a page change. */

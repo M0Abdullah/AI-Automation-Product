@@ -2,13 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { AppConfigService } from '../config/app-config.service';
-import type {
-  AssertionResult,
-  ErrorType,
-  StepResult,
-  TestAssertion,
-  TestStep,
-} from '../common/test-plan.types';
+import type { BrowserContext, Page } from 'playwright';
+import type { AssertionResult, ErrorType, StepResult } from '../common/test-plan.types';
 import { executeStep, type ActionContext } from './action-handlers';
 import { runAssertion } from './assertion-handlers';
 import { BrowserFactory, type StorageState } from './browser.factory';
@@ -109,11 +104,11 @@ export class TestExecutorService {
         await waitForInteractiveContent(page, settleOptions);
       }
 
-      // ----------------------------------------------------------- steps
+      // Steps
       for (const [index, step] of testCase.steps.entries()) {
         const s0 = Date.now();
         try {
-          const outcome = await executeStep(page, step as TestStep, actionCtx);
+          const outcome = await executeStep(page, step, actionCtx);
           stepResults.push({
             index,
             action: step.action,
@@ -153,11 +148,11 @@ export class TestExecutorService {
         }
       }
 
-      // ------------------------------------------------------ assertions
+      // Assertions
       if (status === 'PASS') {
         for (const [index, assertion] of testCase.assertions.entries()) {
           try {
-            const outcome = await runAssertion(page, assertion as TestAssertion, {
+            const outcome = await runAssertion(page, assertion, {
               timeoutMs: assertionTimeout,
               evidence,
             });
@@ -205,7 +200,7 @@ export class TestExecutorService {
 
       finalUrl = page.url();
 
-      // -------------------------------------------------------- evidence
+      // Evidence
       if (status !== 'PASS') {
         screenshotPath = await this.captureScreenshot(page, runId, testCase.id, attempt);
       }
@@ -261,11 +256,11 @@ export class TestExecutorService {
     };
   }
 
-  // ------------------------------------------------------------- artifacts
+  // Artifacts
 
   /** Returns a path relative to ARTIFACTS_DIR, which is what the API serves. */
   private async captureScreenshot(
-    page: import('playwright').Page,
+    page: Page,
     runId: string,
     caseId: string,
     attempt: number,
@@ -283,7 +278,7 @@ export class TestExecutorService {
   }
 
   private async stopTraceToFile(
-    context: import('playwright').BrowserContext,
+    context: BrowserContext,
     runId: string,
     caseId: string,
     attempt: number,

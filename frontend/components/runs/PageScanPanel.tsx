@@ -1,4 +1,4 @@
-import type { PageSnapshot } from '../lib/types';
+import type { PageSnapshot } from '@/lib/types';
 
 /**
  * WHAT THE AI WAS ALLOWED TO SEE.
@@ -60,7 +60,13 @@ export function PageScanPanel({ snapshot }: { snapshot: PageSnapshot }) {
         </div>
       )}
 
-      <Group title="Input fields" rows={fields.map((f) => [f.label, `${f.type ?? 'text'}${f.required ? ' · required' : ''}${f.labelSource ? ` · label from ${f.labelSource}` : ''}`])} />
+      <Group
+        title="Input fields"
+        rows={fields.map((f) => [
+          f.label,
+          `${f.type ?? 'text'}${f.required ? ' · required' : ''}${f.labelSource ? ` · label from ${f.labelSource}` : ''}`,
+        ])}
+      />
       <Group title="Buttons" rows={buttons.map((b) => [b.label, ''])} />
       <Group title="Selects" rows={selects.map((s) => [s.label, (s.options ?? []).join(', ')])} />
       <Group title="Checkboxes / radios" rows={toggles.map((t) => [t.label, t.kind])} />

@@ -115,7 +115,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     };
   }
 
-  // ------------------------------------------------------------------ internals
+  // Internals
 
   private request(req: LlmJsonRequest, useJsonSchema: boolean) {
     const { model, maxTokens, temperature } = this.config.llm;
@@ -127,7 +127,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
             json_schema: {
               name: req.jsonSchema.name,
               strict: req.jsonSchema.strict ?? false,
-              schema: req.jsonSchema.schema as Record<string, unknown>,
+              schema: req.jsonSchema.schema,
             },
           }
         : { type: 'json_object' };

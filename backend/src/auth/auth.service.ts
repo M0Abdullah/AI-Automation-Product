@@ -1,9 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'node:crypto';
 import { UserRole } from '../common/enums';
@@ -193,7 +188,7 @@ export class AuthService {
     });
   }
 
-  // ------------------------------------------------------------- internals
+  // Internals
 
   /**
    * SIGN-IN ALERT — a security notice to the account owner.

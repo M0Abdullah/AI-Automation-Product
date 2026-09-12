@@ -11,7 +11,19 @@ import { TestExecutorService } from './test-executor.service';
  * container without changing the rest of the application.
  */
 @Module({
-  providers: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
-  exports: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
+  providers: [
+    BrowserFactory,
+    PageScannerService,
+    SiteCrawlerService,
+    TestExecutorService,
+    SessionService,
+  ],
+  exports: [
+    BrowserFactory,
+    PageScannerService,
+    SiteCrawlerService,
+    TestExecutorService,
+    SessionService,
+  ],
 })
 export class BrowserModule {}

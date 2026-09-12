@@ -1,4 +1,4 @@
-import { FigmaNode, firstSolidFill, paintToHex, walkNodes } from './figma.service';
+import { type FigmaNode, firstSolidFill, paintToHex, walkNodes } from './figma.service';
 
 /**
  * TURNING A FIGMA FILE INTO RULES THAT CAN BE CHECKED.
@@ -204,15 +204,21 @@ export function extractDesignSpec(args: {
       bump(radii, Math.round(n.cornerRadius));
     }
 
-    // ------------------------------------------------------------- spacing
+    // Spacing
     // Auto-layout padding and gaps ARE the design's spacing scale. A design
     // that lays out on an 8px grid will show 8/16/24/32 here, which is exactly
     // the rule a hand-written 15px gap breaks.
-    for (const gap of [n.itemSpacing, n.paddingTop, n.paddingRight, n.paddingBottom, n.paddingLeft]) {
+    for (const gap of [
+      n.itemSpacing,
+      n.paddingTop,
+      n.paddingRight,
+      n.paddingBottom,
+      n.paddingLeft,
+    ]) {
       if (typeof gap === 'number' && gap > 0 && gap <= 96) bump(spacings, Math.round(gap));
     }
 
-    // -------------------------------------------------------------- colour
+    // Colour
     const fill = firstSolidFill(n);
     const hex = paintToHex(fill);
 

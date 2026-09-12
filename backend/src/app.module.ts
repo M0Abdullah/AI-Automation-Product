@@ -7,8 +7,9 @@ import { BrowserModule } from './browser/browser.module';
 import { DesignModule } from './design/design.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CounterService } from './common/counter.service';
-import { SystemController } from './common/system.controller';
 import { AppConfigModule } from './config/config.module';
+import { ContentIssuesModule } from './content-issues/content-issues.module';
+import { DesignIssuesModule } from './design-issues/design-issues.module';
 import { FindingsModule } from './findings/findings.module';
 import { LlmModule } from './llm/llm.module';
 import { MailModule } from './mail/mail.module';
@@ -18,6 +19,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { ResultsModule } from './results/results.module';
 import { RunsModule } from './runs/runs.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { SystemModule } from './system/system.module';
 import { TestCasesModule } from './test-cases/test-cases.module';
 
 /**
@@ -25,7 +27,9 @@ import { TestCasesModule } from './test-cases/test-cases.module';
  *
  *  infrastructure : AppConfig, Prisma, Secrets, Auth, Mail (global)
  *  capability     : Llm (brain), Browser (hands), Policy (gate)
- *  product        : Projects, Runs, TestCases, Results, Findings, Artifacts
+ *  product        : Projects, Runs, TestCases, Results, Findings,
+ *                   ContentIssues, DesignIssues, Artifacts
+ *  diagnostics    : System (health, capabilities, integrations)
  *
  * JwtAuthGuard is registered as a GLOBAL guard, so the API is default-deny:
  * a new endpoint is protected unless it is explicitly marked @Public().
@@ -52,9 +56,12 @@ import { TestCasesModule } from './test-cases/test-cases.module';
     TestCasesModule,
     ResultsModule,
     FindingsModule,
+    ContentIssuesModule,
+    DesignIssuesModule,
     ArtifactsModule,
+    // diagnostics
+    SystemModule,
   ],
-  controllers: [SystemController],
   providers: [CounterService, { provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
 export class AppModule {}
