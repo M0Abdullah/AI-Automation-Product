@@ -13,6 +13,9 @@ dist/
 out/
 # generated prisma client
 backend/src/generated/
+# incremental typescript build cache. Regenerated on every build, and it
+# churns on every commit if tracked.
+*.tsbuildinfo
 # test evidence (screenshots / traces / videos)
 #
 # ANCHORED with a leading slash, and that matters: the unanchored form
@@ -28,6 +31,8 @@ npm-debug.log*
 # os
 .DS_Store
 Thumbs.db
+
+# local scratch output from the diagnostic scripts
 check-browser.png
 
 # stray local database files. The platform runs on MongoDB now, but an old

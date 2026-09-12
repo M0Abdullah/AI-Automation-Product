@@ -169,7 +169,7 @@ computed `summary`.
 
   "testCases": [
     { "id": "…", "pageId": "…", "pageUrl": "https://staging.example.com/",
-      "title": "…", "steps": [], "assertions": [], "approved": false, "results": [] }
+      "title": "…", "steps": [], "assertions": [], "approved": true, "results": [] }
   ],
   "findings": [],
   "rejections": [
@@ -178,7 +178,7 @@ computed `summary`.
   ],
   "summary": {
     "totalPages": 9, "pagesPlanned": 7, "pagesFailed": 1, "pagesSkipped": 1,
-    "totalCases": 31, "approvedCases": 0, "executed": 0,
+    "totalCases": 31, "approvedCases": 31, "executed": 0,
     "passed": 0, "failed": 0, "errored": 0, "flaky": 0,
     "openFindings": 0, "confirmedFindings": 0
   }
@@ -237,13 +237,17 @@ Separate from `GET /runs/:id` for payload-size reasons only.
 | `SCAN_FAILED` | **no** page could be read. One unreadable page among many does not do this — it fails that `RunPage` only | no |
 | `PLANNING` | the LLM is writing test cases | yes |
 | `PLAN_FAILED` | no page produced a single accepted case | no |
-| `AWAITING_APPROVAL` | needs a human | no |
-| `RUNNING` | executing approved cases | yes |
+| `AWAITING_APPROVAL` | **legacy.** No new run reaches this — planning flows straight into `RUNNING`. Kept so rows created before that change still render | no |
+| `RUNNING` | executing the planned cases | yes |
 | `COMPLETED` | finished (may still contain failures) | no |
 
 ### `POST /runs/:id/execute`
 
-Runs every approved, non-rejected case. `400` if none are approved, or if the run is already executing.
+**Re-runs** a run that has already finished. The first execution needs no call: `POST /runs`
+scans, plans and starts executing on its own.
+
+Runs every non-rejected case. `400` if the run has no runnable case, or if it is already
+executing.
 
 ```json
 { "started": true, "approvedCount": 3 }
@@ -297,11 +301,16 @@ Edit a case. **Re-validated by the policy engine** — a rejected edit is not sa
 
 Sending `steps` or `assertions` flips `source` to `MANUAL`.
 
-### `POST /test-cases/:id/approve` · `POST /test-cases/:id/reject`
+### `POST /test-cases/:id/reject` · `POST /test-cases/:id/approve`
 
-`reject` takes an optional `{ "reason": "…" }`.
+`reject` excludes a case from the next execution and takes an optional `{ "reason": "…" }`.
+`approve` is the undo — it puts a rejected case back.
+
+Cases are created already approved, so neither is needed on a normal run.
 
 ### `POST /runs/:runId/test-cases/approve-all`
+
+Restores every rejected case in the run.
 
 ```json
 { "approved": 5 }
@@ -309,7 +318,7 @@ Sending `steps` or `assertions` flips `source` to `MANUAL`.
 
 ### `POST /test-cases/:id/retest`
 
-Re-runs this one case now and returns the new result. This is the **"Ready for Retest"** action — a developer says it is fixed, QA presses retest. Synchronous, because the user is watching one test.
+Re-runs this one case now and returns the new result — a developer says it is fixed, you press retest. Synchronous, because the user is watching one test.
 
 ---
 

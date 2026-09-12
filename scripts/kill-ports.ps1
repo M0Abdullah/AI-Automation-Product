@@ -1,7 +1,7 @@
 # Frees the ports this project uses, and kills any stray node process still
 # holding files (which is what causes "EADDRINUSE" and Prisma's EPERM error).
 #
-#   .\kill-ports.ps1
+#   .\scripts\kill-ports.ps1
 #
 # Safe to run any time. It only touches processes listening on these ports, or
 # node processes whose command line points at this project folder.

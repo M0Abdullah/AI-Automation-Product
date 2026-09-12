@@ -1,5 +1,4 @@
-import type { FindingStatus, ResultStatus, RunStatus, TicketStatus } from '../lib/types';
-import { TICKET_STATUS_LABEL } from '../lib/types';
+import type { FindingStatus, ResultStatus, RunStatus } from '../lib/types';
 
 type Tone = 'pass' | 'fail' | 'warn' | 'info' | 'neutral' | 'brand';
 
@@ -166,17 +165,3 @@ export function CategoryBadge({ value }: { value?: string | null }) {
   );
 }
 
-/** Ticket lifecycle colours. READY_FOR_RETEST is brand-coloured because it is
- *  the handoff back to QA - the state somebody must act on. */
-const TICKET_TONE: Record<TicketStatus, Tone> = {
-  OPEN: 'warn',
-  IN_PROGRESS: 'info',
-  READY_FOR_RETEST: 'brand',
-  RESOLVED: 'pass',
-  REOPENED: 'fail',
-  CLOSED: 'neutral',
-};
-
-export function TicketStatusBadge({ status }: { status: TicketStatus }) {
-  return <Badge tone={TICKET_TONE[status]}>{TICKET_STATUS_LABEL[status]}</Badge>;
-}

@@ -209,13 +209,6 @@ export interface Finding {
   module?: string | null;
   build?: string | null;
   priority?: string | null;
-  ticket?: {
-    id: string;
-    key: string;
-    status: TicketStatus;
-    externalKey?: string | null;
-    externalUrl?: string | null;
-  } | null;
   runId: string;
   testCaseId: string;
   resultId: string;
@@ -479,111 +472,6 @@ export interface LoginSession {
   revokedAt?: string | null;
 }
 
-// =================================================================== tickets
-
-export type TicketStatus =
-  | 'OPEN'
-  | 'IN_PROGRESS'
-  | 'READY_FOR_RETEST'
-  | 'RESOLVED'
-  | 'REOPENED'
-  | 'CLOSED';
-
-export interface TicketComment {
-  id: string;
-  body: string;
-  createdAt: string;
-  author?: { id: string; name: string; email: string } | null;
-}
-
-export interface TicketEvent {
-  id: string;
-  field: string;
-  fromValue?: string | null;
-  toValue?: string | null;
-  actor: string;
-  note?: string | null;
-  createdAt: string;
-}
-
-export interface Ticket {
-  id: string;
-  key: string;
-  number: number;
-  findingId: string;
-  title: string;
-  description: string;
-  status: TicketStatus;
-  priority: string;
-  severity?: string | null;
-  module?: string | null;
-  build?: string | null;
-  /** A real array now, not a comma-separated string. */
-  labels: string[];
-  dueDate?: string | null;
-  assignee?: { id: string; name: string; email: string } | null;
-  reporter?: { id: string; name: string; email: string } | null;
-  externalKey?: string | null;
-  externalUrl?: string | null;
-  externalProvider?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string | null;
-  closedAt?: string | null;
-  finding?: {
-    id: string;
-    bugKey?: string | null;
-    status: string;
-    severity?: string | null;
-    aiClassification?: string | null;
-    humanClassification?: string | null;
-    occurrences: number;
-    runId: string;
-    testCaseId: string;
-    result?: {
-      id: string;
-      screenshotPath?: string | null;
-      tracePath?: string | null;
-      browserName?: string | null;
-      viewport?: string | null;
-      attempt?: number;
-    } | null;
-  };
-  comments?: TicketComment[];
-  events?: TicketEvent[];
-}
-
-/**
- * WHICH ISSUE TRACKER THIS INSTANCE FILES INTO.
- *
- * `enabled` folds together "a provider is selected" and "it is fully
- * configured", so no component has to re-derive whether a push can work.
- */
-export type TrackerName = 'jira' | 'clickup' | 'linear';
-
-/** Where a confirmed bug can be filed. 'local' keeps it in this tool only. */
-export type TicketDestination = TrackerName | 'local';
-
-export interface TrackerStatus {
-  enabled: boolean;
-  /** The DEFAULT selection, not the only option. See `providers`. */
-  provider: 'none' | TrackerName;
-  /** Human label, e.g. "Jira (acme.atlassian.net, project QA)". */
-  describe: string;
-  /** True when a confirmed defect is filed automatically, with no extra click. */
-  autoPush: boolean;
-  /** Env vars still missing. Empty when `enabled`. */
-  missingConfig: string[];
-  /**
-   * EVERY tracker that is fully configured — the options to offer the user.
-   * More than one can be set up at once, so the destination is a per-bug
-   * choice rather than a deployment setting.
-   */
-  providers: Array<{ name: TrackerName; describe: string }>;
-  /** The ones that are not set up, and what each is missing. */
-  unconfigured: Array<{ name: TrackerName; missingConfig: string[] }>;
-}
-
 /**
  * EVERYTHING THIS INSTANCE IS CONNECTED TO.
  *
@@ -591,38 +479,22 @@ export interface TrackerStatus {
  * behind it is readable by every role, VIEWER included.
  */
 export interface IntegrationStatus {
-  tracker: TrackerStatus;
   mail: {
     enabled: boolean;
     host: string | null;
     port: number;
     from: string | null;
     /** Which notifications would actually be sent. */
-    events: { onLogin: boolean; onRunFinished: boolean; onBugFiled: boolean };
+    events: {
+      onLogin: boolean;
+      onUserJoined: boolean;
+      onRunStarted: boolean;
+      onRunFinished: boolean;
+    };
     /** The base every link in an email is built from. */
     appUrl: string;
   };
 }
-
-/** Human labels for the ticket lifecycle. */
-export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
-  OPEN: 'Open',
-  IN_PROGRESS: 'In progress',
-  READY_FOR_RETEST: 'Ready for retest',
-  RESOLVED: 'Resolved',
-  REOPENED: 'Reopened',
-  CLOSED: 'Closed',
-};
-
-/** Mirrors TICKET_TRANSITIONS on the backend, so the UI only offers legal moves. */
-export const TICKET_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  OPEN: ['IN_PROGRESS', 'CLOSED'],
-  IN_PROGRESS: ['READY_FOR_RETEST', 'OPEN', 'CLOSED'],
-  READY_FOR_RETEST: ['RESOLVED', 'REOPENED', 'IN_PROGRESS'],
-  RESOLVED: ['CLOSED', 'REOPENED'],
-  REOPENED: ['IN_PROGRESS', 'CLOSED'],
-  CLOSED: ['REOPENED'],
-};
 
 export const SEVERITY_LABEL: Record<string, string> = {
   S1_BLOCKER: 'S1 Blocker',
@@ -637,7 +509,6 @@ export interface DashboardOverview {
   runs: { total: number; byStatus: Record<string, number> };
   tests: {
     total: number;
-    approved: number;
     humanEdited: number;
     executed: number;
     passed: number;
@@ -653,11 +524,6 @@ export interface DashboardOverview {
     confirmed: number;
     bySeverity: Record<string, number>;
     byClassification: Record<string, number>;
-  };
-  tickets: {
-    byStatus: Record<string, number>;
-    open: number;
-    readyForRetest: number;
   };
   llm: { tokensIn: number; tokensOut: number };
   recentRuns: Array<{
@@ -678,14 +544,6 @@ export interface DashboardOverview {
     occurrences: number;
     runId: string;
     testCase: { title: string; priority: string };
-  }>;
-  needsRetest: Array<{
-    id: string;
-    key: string;
-    title: string;
-    status: TicketStatus;
-    priority: string;
-    assignee?: { name: string } | null;
   }>;
 }
 

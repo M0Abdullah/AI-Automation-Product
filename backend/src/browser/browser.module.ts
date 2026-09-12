@@ -12,8 +12,6 @@ import { TestExecutorService } from './test-executor.service';
  */
 @Module({
   providers: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
-  // BrowserFactory is exported so ReportsModule can print PDFs with the same
-  // Chromium instance instead of pulling in a separate PDF library.
   exports: [BrowserFactory, PageScannerService, SiteCrawlerService, TestExecutorService, SessionService],
 })
 export class BrowserModule {}

@@ -14,10 +14,11 @@ import { extractDesignSpec, specIsUsable } from '../design/design-spec';
 import { FigmaError, FigmaService } from '../design/figma.service';
 import { checksForPage, resolveChecks } from '../common/check-catalog';
 import { readJson, writeJson, writeJsonNullable } from '../common/json';
-import { Classification, ResultStatus, RunPageStatus, RunStatus } from '../common/enums';
+import { Classification, LogLevel, ResultStatus, RunPageStatus, RunStatus } from '../common/enums';
 import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
 import { MailService } from '../mail/mail.service';
+import type { Failure } from '../mail/templates';
 import { PolicyService } from '../policy/policy.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SecretsService } from '../secrets/secrets.service';
@@ -32,17 +33,24 @@ import type { StepResult, TestAssertion, TestStep } from '../common/test-plan.ty
  *     3. Per page: Playwright scans it                -> PageSnapshot
  *     4. Per page: LLM turns requirements + snapshot   -> proposed cases
  *     5. Policy engine validates every step           -> accepted / rejected
- *     6. Accepted cases saved, run -> AWAITING_APPROVAL
+ *     6. Accepted cases saved and run -> RUNNING, with no stop in between
  *
  *   EXECUTE PHASE (executeApproved)
- *     7. Playwright runs each APPROVED case, starting at ITS OWN page
+ *     7. Playwright runs each case, starting at ITS OWN page
  *     8. Failures get one clean rerun                 -> FLAKY detection
- *     9. Every non-pass creates a Finding             -> awaiting human triage
+ *     9. Every non-pass creates a Finding             -> what failed and why
  *    10. LLM suggests a classification                -> advisory only
  *
+ * ONE URL IN, RESULTS OUT. There is no approval click between planning and
+ * execution. Safety is enforced by PolicyService at step 5, which is where it
+ * belongs: it rejects any step that leaves the target's origin, exceeds the
+ * step budget, or touches a destructive keyword, and it does so on every run
+ * whether or not somebody is watching. A human clicking "approve all" without
+ * reading forty cases added delay, not scrutiny.
+ *
  * WHOLE-APP MODE. Steps 3-5 loop over every page the crawler found, which is
- * what turns "test my login screen" into "test my app". One run, one approval
- * gate, one findings list.
+ * what turns "test my login screen" into "test my app". One run, one findings
+ * list.
  *
  * The loop is SEQUENTIAL, not parallel, and that is deliberate. Free-tier LLM
  * accounts are rate-limited per minute, and firing twelve planning calls at
@@ -325,8 +333,17 @@ export class RunPipelineService {
           order: totalAccepted + n,
           steps: writeJson(c.steps),
           assertions: writeJson(c.assertions),
-          // Nothing is pre-approved. A human decides on every case.
-          approved: false,
+          // AUTO-APPROVED. The gate that used to sit here was a click, and a
+          // click is not what makes this safe: PolicyService has already
+          // rejected every step that leaves the target's origin, exceeds the
+          // step budget, or touches a destructive keyword, and a case the
+          // policy engine rejected never reaches this line. What the click
+          // added was delay - a run sat idle until somebody noticed it.
+          //
+          // Destructive cases still require `allowDestructive` on the run, so
+          // "delete", "pay" and "send" remain opt-in. That is the real gate.
+          approved: true,
+          approvedAt: new Date(),
         })),
       });
 
@@ -356,33 +373,27 @@ export class RunPipelineService {
       return;
     }
 
+    // STRAIGHT INTO EXECUTION - there is no approval stop.
+    //
+    // The plan is written and the tests start. Everything here is still
+    // committed before execution begins, because the UI reloads the run as
+    // soon as it sees the status change and a half-written row would render
+    // as an empty plan.
     await this.prisma.run.update({
       where: { id: runId },
       data: {
-        status: RunStatus.AWAITING_APPROVAL,
+        status: RunStatus.RUNNING,
+        execStartedAt: new Date(),
+        finishedAt: null,
         statusMessage:
           pages.length === 1
-            ? `${totalAccepted} test case(s) ready for review.`
-            : `${totalAccepted} test case(s) across ${scannedPages} page(s), ready for review.`,
+            ? `Running ${totalAccepted} test case(s).`
+            : `Running ${totalAccepted} test case(s) across ${scannedPages} page(s).`,
         llmModel: llmMeta.model || null,
         llmTokensIn: llmMeta.tokensIn || null,
         llmTokensOut: llmMeta.tokensOut || null,
         llmLatencyMs: llmMeta.latencyMs || null,
       },
-    });
-
-    // IT IS THE USER'S TURN, AND THEY HAVE TO BE TOLD.
-    //
-    // The pipeline stops dead here by design - nothing opens a browser against
-    // a real site until a human approves the plan. The cost of that gate is
-    // that a run nobody is notified about sits in AWAITING_APPROVAL forever,
-    // while the user believes the tool is still working. This email is the
-    // whole reason the gate does not become a black hole.
-    this.notifyTestsReady({
-      runId,
-      totalAccepted,
-      pagesPlanned: scannedPages,
-      totalPages: pages.length,
     });
 
     this.logger.log(
@@ -391,11 +402,14 @@ export class RunPipelineService {
     );
 
     // ------------------------------- 4. wording pass (advisory, in the background)
-    // Deliberately after the plan and not awaited: it reads copy the scan
-    // already captured, so it cannot influence the plan, and making the user
-    // wait for a spell-check of twelve pages before seeing their test cases
-    // would be a poor trade. Sequential inside, to stay under the rate limit.
+    // Deliberately not awaited: it reads copy the scan already captured, so it
+    // cannot influence the plan, and the browser tests must not queue behind a
+    // spell-check of twelve pages. Sequential inside, to stay under the rate
+    // limit.
     void this.runContentChecks(runId, forContentCheck);
+
+    // ------------------------------------------------- 5. run them
+    this.startExecution(runId);
   }
 
   /**
@@ -780,50 +794,6 @@ export class RunPipelineService {
   }
 
   /**
-   * "N tests are waiting for your approval."
-   *
-   * The one notification the product cannot do without - see the call site.
-   */
-  private notifyTestsReady(input: {
-    runId: string;
-    totalAccepted: number;
-    pagesPlanned: number;
-    totalPages: number;
-  }): void {
-    if (!this.config.mail.onTestsReady) return;
-
-    void (async () => {
-      try {
-        const run = await this.prisma.run.findUnique({
-          where: { id: input.runId },
-          include: {
-            createdBy: { select: { name: true, email: true } },
-            pages: { select: { status: true } },
-          },
-        });
-        if (!run?.createdBy?.email) return;
-
-        await this.mail.sendTestsReady({
-          to: run.createdBy.email,
-          name: run.createdBy.name,
-          runId: run.id,
-          runName: run.name,
-          targetUrl: run.targetUrl,
-          caseCount: input.totalAccepted,
-          pagesPlanned: input.pagesPlanned,
-          pagesFailed: run.pages.filter(
-            (p) =>
-              p.status === RunPageStatus.SCAN_FAILED || p.status === RunPageStatus.PLAN_FAILED,
-          ).length,
-          totalPages: input.totalPages,
-        });
-      } catch (err) {
-        this.logger.warn(`Could not send the tests-ready email for ${input.runId}: ${String(err)}`);
-      }
-    })();
-  }
-
-  /**
    * EMAIL THE PERSON WHO STARTED THE RUN.
    *
    * This is the "tell me when my audit is done" notification, and it is the
@@ -831,9 +801,12 @@ export class RunPipelineService {
    * is watching is not a report.
    *
    * Fire-and-forget, and every failure is swallowed: a mail outage must never
-   * lose a completed run's results. It is sent only for a finished EXECUTION,
-   * not when planning completes, because a plan awaiting approval already sends
-   * the user back to the app to act.
+   * lose a completed run's results.
+   *
+   * It carries the failures themselves, not only the counts. Now that a run
+   * goes from URL to results with no stop in between, this email is the first
+   * thing the user sees about the run — so "3 failed" without saying WHAT
+   * failed would force a login just to learn whether it can wait.
    */
   private notifyRunFinished(runId: string): void {
     if (!this.config.mail.onRunFinished) return;
@@ -846,7 +819,30 @@ export class RunPipelineService {
             createdBy: { select: { name: true, email: true } },
             pages: { select: { status: true } },
             testCases: {
-              select: { approved: true, rejected: true, results: { select: { status: true } } },
+              select: {
+                title: true,
+                pageUrl: true,
+                results: {
+                  orderBy: { startedAt: 'asc' },
+                  select: {
+                    status: true,
+                    errorType: true,
+                    errorMessage: true,
+                    expected: true,
+                    actual: true,
+                    consoleLogs: {
+                      where: { level: LogLevel.ERROR },
+                      take: 2,
+                      select: { message: true },
+                    },
+                    networkLogs: {
+                      where: { status: { gte: 400 } },
+                      take: 2,
+                      select: { method: true, url: true, status: true },
+                    },
+                  },
+                },
+              },
             },
             findings: { select: { status: true } },
             _count: { select: { contentIssues: true, designIssues: true } },
@@ -888,6 +884,7 @@ export class RunPipelineService {
           },
           contentIssues: run._count.contentIssues,
           designIssues: run._count.designIssues,
+          failures: buildFailureList(run.testCases),
         });
       } catch (err) {
         this.logger.warn(`Could not send the run-finished email for ${runId}: ${String(err)}`);
@@ -1602,4 +1599,73 @@ export function buildSignature(input: {
 
 function msg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * THE FAILURES, IN WORDS, FOR THE EMAIL.
+ *
+ * Reads the LATEST result per case, for the same reason the counts do: a FAIL
+ * that passed on its clean rerun is FLAKY, not a failure, and reporting it as
+ * broken is how a tool earns a mail filter.
+ *
+ * The reason is taken from the executor — the assertion that did not hold, or
+ * the error it raised. It is never the AI's triage opinion: that is a guess,
+ * and a guess does not belong in a summary somebody forwards to a developer.
+ */
+function buildFailureList(
+  testCases: {
+    title: string;
+    pageUrl: string | null;
+    results: {
+      status: string;
+      errorType: string | null;
+      errorMessage: string | null;
+      expected: string | null;
+      actual: string | null;
+      consoleLogs: { message: string }[];
+      networkLogs: { method: string; url: string; status: number | null }[];
+    }[];
+  }[],
+): Failure[] {
+  const out: Failure[] = [];
+
+  for (const tc of testCases) {
+    const last = tc.results.length ? tc.results[tc.results.length - 1] : null;
+    if (!last) continue;
+    if (last.status !== ResultStatus.FAIL && last.status !== ResultStatus.ERROR) continue;
+
+    // Expected/actual first: it is the most specific thing we know, and it is
+    // the sentence a developer can act on without opening anything.
+    const reason =
+      last.expected && last.actual
+        ? `Expected ${last.expected}, but got ${last.actual}.`
+        : last.errorMessage?.trim() ||
+          (last.errorType ? `${last.errorType} — no further detail was captured.` : 'The test did not complete.');
+
+    const evidence = [
+      ...last.consoleLogs.map((c) => `console: ${c.message.slice(0, 160)}`),
+      ...last.networkLogs.map(
+        (n) => `${n.method} ${shortenUrl(n.url)} → ${n.status ?? 'no response'}`,
+      ),
+    ];
+
+    out.push({
+      title: tc.title,
+      url: tc.pageUrl,
+      reason: reason.slice(0, 400),
+      evidence,
+    });
+  }
+
+  return out;
+}
+
+/** Keeps a long query string from pushing the status code off a phone screen. */
+function shortenUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.pathname}${u.search ? '?…' : ''}`;
+  } catch {
+    return url.slice(0, 80);
+  }
 }

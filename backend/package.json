@@ -1,6 +1,6 @@
 {
   "name": "aitest-backend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI testing platform - control plane (NestJS) + browser worker (Playwright)",
   "private": true,
   "scripts": {
@@ -19,7 +19,7 @@
     "lint": "eslint \"src/**/*.ts\" --fix",
     "test": "jest",
     "set:owner": "ts-node -r tsconfig-paths/register scripts/set-owner.ts",
-    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../kill-ports.ps1",
+    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/kill-ports.ps1",
     "release": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/release.ps1"
   },
   "dependencies": {

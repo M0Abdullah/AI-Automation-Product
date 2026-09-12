@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  One command to commit, tag, push and publish a GitHub release.
+  One command to check, bump, commit and push. CI publishes the release.
 
 .DESCRIPTION
   Everything a release needs, in the order that cannot go wrong:
@@ -8,19 +8,30 @@
     1. refuse to run on a dirty tree unless -Message is given
     2. SCAN FOR SECRETS in everything about to be pushed   <-- the important one
     3. verify both apps typecheck and build
-    4. bump the version in both package.json files
-    5. commit, tag, push
-    6. publish the GitHub release with notes from CHANGELOG.md
+    4. check CHANGELOG.md actually documents this version
+    5. bump the version in both package.json files
+    6. commit and push
+
+  THEN CI TAKES OVER. The release job in .github/workflows/ci.yml re-runs the
+  build and the secret scan on GitHub's runners, and if the pushed version has
+  no tag yet it creates v<version> and publishes the GitHub release with the
+  notes from CHANGELOG.md.
+
+  This script deliberately does NOT tag. Two things creating tags is how you end
+  up with a tag on one commit and a release on another - so tagging lives in
+  exactly one place, and it is the place that has just proven the build is
+  green. It also means a release needs no local tooling at all: bump the version
+  in a PR, merge it, done.
 
   Step 2 is why this script exists rather than a README bullet list. This
-  product's .env holds an LLM key, a Gmail app password, Jira and ClickUp API
-  tokens and the AES key that encrypts customers' test credentials. A push is
-  not reversible - a leaked token is leaked even if the commit is deleted a
-  minute later, because GitHub's event feed is already public. So the scan runs
-  before anything leaves the machine, and a hit aborts the release.
+  product's .env holds an LLM key, a Gmail app password and the AES key that
+  encrypts customers' test credentials. A push is not reversible - a leaked
+  token is leaked even if the commit is deleted a minute later, because GitHub's
+  event feed is already public. So the scan runs before anything leaves the
+  machine, and a hit aborts the release. CI scans again on the other side.
 
 .PARAMETER Version
-  e.g. 0.3.0 - without the "v".
+  e.g. 0.4.0 - without the "v".
 
 .PARAMETER Message
   Commit message. Required only if the working tree is dirty.
@@ -29,8 +40,8 @@
   Run every check, change nothing, push nothing.
 
 .EXAMPLE
-  .\scripts\release.ps1 -Version 0.3.0 -DryRun
-  .\scripts\release.ps1 -Version 0.3.0 -Message "feat: MongoDB, whole-app runs, Jira/ClickUp"
+  .\scripts\release.ps1 -Version 0.4.0 -DryRun
+  .\scripts\release.ps1 -Version 0.4.0 -Message "feat: runs start themselves"
 #>
 [CmdletBinding()]
 param(
@@ -75,7 +86,7 @@ function Invoke-Native {
 }
 
 $tag = "v$Version"
-Write-Host "Releasing $tag" -ForegroundColor White
+Write-Host "Preparing $tag" -ForegroundColor White
 if ($DryRun) { Write-Host "(dry run - nothing will be pushed)" -ForegroundColor Yellow }
 
 # ---------------------------------------------------------------- 1. tree
@@ -87,7 +98,12 @@ if ($dirty -and -not $Message) {
 if ($dirty) { Ok "$(($dirty | Measure-Object).Count) change(s) will be committed" }
 else { Ok 'clean' }
 
-if (git tag -l $tag) { Die "$tag already exists. Bump the version." }
+if (git tag -l $tag) { Die "$tag already exists locally. Bump the version." }
+# CI creates the tag on the REMOTE, so a local repo that has not fetched will
+# happily prepare a version that already shipped. Ask origin directly.
+$remoteTag = @(& git ls-remote --tags origin "refs/tags/$tag" 2>$null)
+$global:LASTEXITCODE = 0
+if ($remoteTag.Count -gt 0) { Die "$tag is already released on origin. Bump the version." }
 Ok "$tag is free"
 
 # ------------------------------------------------------------- 2. SECRETS
@@ -149,7 +165,18 @@ foreach ($c in $checks) {
     Ok $c.n
 }
 
-# ------------------------------------------------------------- 4. versions
+# ----------------------------------------------------------- 4. changelog
+# CI refuses to publish a version CHANGELOG.md does not describe, because the
+# release notes ARE that section. Catching it here means finding out before the
+# push rather than from a red job afterwards.
+Step 'Changelog'
+$changelog = Get-Content "$repo\CHANGELOG.md" -Raw
+if ($changelog -notmatch [regex]::Escape("## [$Version]")) {
+    Die "CHANGELOG.md has no '## [$Version]' section. Write the entry first - it becomes the release notes."
+}
+Ok "CHANGELOG.md documents $Version"
+
+# ------------------------------------------------------------- 5. versions
 Step 'Version bump'
 foreach ($pkg in @("$repo\backend\package.json", "$repo\frontend\package.json")) {
     $json = Get-Content $pkg -Raw
@@ -158,48 +185,37 @@ foreach ($pkg in @("$repo\backend\package.json", "$repo\frontend\package.json"))
     Ok "$(Split-Path $pkg -Parent | Split-Path -Leaf) -> $Version"
 }
 
-# --------------------------------------------------------- 5. commit + tag
-Step 'Commit, tag, push'
+# ------------------------------------------------------- 6. commit + push
+# No tag here on purpose. CI tags the commit it has just built - see the header.
+Step 'Commit and push'
 if ($DryRun) {
-    Write-Host '  (dry run) would commit, tag and push' -ForegroundColor Yellow
-} else {
-    git add -A
-    $msg = if ($Message) { $Message } else { "chore: release $tag" }
-    git commit -m $msg --allow-empty | Out-Null
-    Ok "committed: $msg"
-    git tag -a $tag -m "Release $tag"
-    Ok "tagged $tag"
-    $r = Invoke-Native -Command 'git push origin HEAD'
-    if ($r.Code -ne 0) { Write-Host $r.Output; Die 'git push' }
-    $r = Invoke-Native -Command "git push origin $tag"
-    if ($r.Code -ne 0) { Write-Host $r.Output; Die 'tag push' }
-    Ok 'pushed'
+    Write-Host '  (dry run) would commit and push' -ForegroundColor Yellow
+    Write-Host "  (dry run) CI would then tag $tag and publish the release" -ForegroundColor Yellow
+    exit 0
 }
 
-# ------------------------------------------------------------ 6. release
-Step 'GitHub release'
+git add -A
+$msg = if ($Message) { $Message } else { "chore: release $tag" }
+git commit -m $msg --allow-empty | Out-Null
+Ok "committed: $msg"
+
+$r = Invoke-Native -Command 'git push origin HEAD'
+if ($r.Code -ne 0) { Write-Host $r.Output; Die 'git push' }
+Ok 'pushed'
+
+# --------------------------------------------------------------- 7. handoff
+Step 'Release'
+Write-Host "  CI is now building $tag. On green it tags this commit and publishes" -ForegroundColor White
+Write-Host "  the release with the CHANGELOG section as the notes." -ForegroundColor White
+
 $gh = Get-Command gh -ErrorAction SilentlyContinue
-if (-not $gh) {
-    Write-Host '  gh CLI not installed - create the release manually, or: winget install GitHub.cli' -ForegroundColor Yellow
-    exit 0
-}
-$r = Invoke-Native -Command 'gh auth status'
-if ($r.Code -ne 0) {
-    Write-Host '  gh is not logged in. Run: gh auth login   then: gh release create ' -NoNewline -ForegroundColor Yellow
-    Write-Host $tag -ForegroundColor Yellow
-    exit 0
-}
-
-# Notes come from CHANGELOG.md so the release and the file can never disagree.
-$notesFile = "$repo\CHANGELOG.md"
-if ($DryRun) {
-    Write-Host "  (dry run) would run: gh release create $tag --notes-file CHANGELOG.md" -ForegroundColor Yellow
-} elseif (Test-Path $notesFile) {
-    gh release create $tag --title $tag --notes-file $notesFile
-    Ok "published $tag"
-} else {
-    gh release create $tag --title $tag --generate-notes
-    Ok "published $tag (auto-generated notes)"
+if ($gh) {
+    $r = Invoke-Native -Command 'gh auth status'
+    if ($r.Code -eq 0) {
+        Write-Host "`n  Watching the run (Ctrl+C to stop - the release continues without you):" -ForegroundColor Cyan
+        & gh run watch --exit-status --compact 2>&1 | Out-Host
+        $global:LASTEXITCODE = 0
+    }
 }
 
 Write-Host "`nDone. https://github.com/M0Abdullah/AI-Automation-Product/releases/tag/$tag" -ForegroundColor Green

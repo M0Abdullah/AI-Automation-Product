@@ -12,7 +12,7 @@ page, or every page of an app.
 | **LLM** (brain) | Reads requirements + a page scan, writes test cases as JSON | No |
 | **Backend** (manager) | Connects everything, validates, stores, serves | No — it applies configured rules |
 | **Playwright** (hands + eyes) | Opens the browser, clicks, types, reads, asserts | **Yes**, through explicit assertions |
-| **Human** | Approves the plan, confirms defects | Final authority |
+| **Human** | Decides which failures are real defects | Final authority |
 
 The LLM and Playwright never talk to each other. The backend sits between them. That is not bureaucracy — it is the security boundary, because page content is untrusted and the model may repeat it.
 
@@ -173,17 +173,33 @@ where.
 If one page's plan is entirely rejected that page becomes `PLAN_FAILED` and the run continues. The
 run ends as `PLAN_FAILED` only when no page produced a single accepted case.
 
-### Phase 5 — the human gate
+### Phase 5 — straight into execution
 
-`test-cases/test-cases.service.ts` · run status `AWAITING_APPROVAL`
+`runs/run-pipeline.service.ts` · run status goes `PLANNING` → `RUNNING`
 
-**One gate for the whole app.** This is the point of doing the crawl inside a run rather than
-telling the user to create twelve runs: twelve runs means twelve approval gates and twelve
-unrelated findings lists. The UI groups the cases by page, because a flat list of 40 cases across
-9 screens is unreviewable — the reviewer cannot tell whether a case belongs on the page it names,
-which is the one judgement approval actually asks for.
+**There is no approval stop.** Accepted cases are written with `approved: true` and the pipeline
+calls `startExecution` itself. A run is one uninterrupted movement from URL to results.
 
-Approve, reject, or edit. **Edits are re-validated through the same policy engine** — a human is trusted more than a model, but not trusted to type an action the executor cannot perform. An edit flips `source` to `MANUAL`, which is what makes "percentage of AI tests approved without edits" measurable later.
+This used to be a human gate, and removing it was a deliberate decision rather than a shortcut.
+The gate was defended as the platform's safety argument, but it was the weakest of the four
+layers: the button that actually got pressed was **Approve all**, on forty cases nobody read.
+What it reliably contributed was latency — a planned run sat idle until somebody noticed it, and
+the email telling them existed only to paper over that.
+
+Safety did not move; it was already one phase earlier. `PolicyService` (phase 4) rejects any step
+that leaves the target's origin, exceeds the step budget, carries no assertion, or touches a
+destructive keyword — and it does that on every run, whether or not a person is watching.
+**Destructive cases still require `allowDestructive` on the run**, which is a decision made before
+the run starts rather than a click during it. That is the real gate.
+
+**One list for the whole app.** This is still the point of doing the crawl inside a run rather
+than telling the user to create twelve runs: twelve runs means twelve unrelated findings lists.
+The UI groups the cases by page, because a flat list of 40 cases across 9 screens is unreadable.
+
+Editing survives. A case can still be edited or excluded — `PATCH /test-cases/:id` and
+`POST /test-cases/:id/reject` — and **edits are re-validated through the same policy engine**: a
+human is trusted more than a model, but not trusted to type an action the executor cannot
+perform. An edit flips `source` to `MANUAL`.
 
 ### Phase 6 — execution
 
@@ -289,7 +305,7 @@ rows and nothing needs a special case.
 fails. Page 3 can be unreachable while 1, 2 and 4–12 plan perfectly. Without a status per page,
 one dead link would have to either fail the whole run or vanish silently, and both are wrong. The
 `Run` status reports the aggregate; `RunPage` reports the page. `summary.pagesFailed` is surfaced
-next to the approve button, because a suite that reads as green while a quarter of the app was
+on the Tests tab, because a suite that reads as green while a quarter of the app was
 never opened is the one dishonest thing whole-app testing could do.
 
 Why the model stays relational in shape even on a document database: every screen is a join
@@ -305,7 +321,7 @@ are native here, so both workarounds are **gone**:
 | Was (SQLite) | Now |
 |---|---|
 | `packJson()` / `unpackJson()` — JSON stored as text | `Json` columns. Steps, assertions, step timelines, page snapshots and AI evidence are real documents |
-| `packTags()` / `unpackTags()` — comma-separated strings | `String[]`. Tags, checks, include/exclude paths and ticket labels are real arrays |
+| `packTags()` / `unpackTags()` — comma-separated strings | `String[]`. Tags, checks and include/exclude paths are real arrays |
 | `src/common/hydrate.ts` — reassembling every response | **Deleted.** What the driver returns *is* the response shape |
 
 What replaced them is `src/common/json.ts`, and it is a **type** boundary rather than a format
@@ -348,8 +364,8 @@ finding ever created failed**, and because the error escaped the execution loop 
 `COMPLETED` after 2 of 6 tests — under-reporting while looking perfectly healthy. Omitting the
 field does *not* help; only a sparse index would, and Prisma cannot declare one.
 
-**The rule:** `@unique` only on a **required** field. `User.email`, `Ticket.key`, `Ticket.number`,
-`Ticket.findingId`, `RunSecret.runId` and `LoginSession.tokenHash` are all required, so their
+**The rule:** `@unique` only on a **required** field. `User.email`, `Finding.bugKey`,
+`RunSecret.runId` and `LoginSession.tokenHash` are all required, so their
 unique indexes are safe and stay.
 
 For an optional field, use a plain `@@index` and enforce uniqueness in application code. Prisma
@@ -362,7 +378,6 @@ declared **one-to-many in the schema and kept one-to-one by the services**:
 | `Finding.contentIssueId` | the promote endpoint returns the existing finding instead of minting a second |
 | `Finding.designIssueId` | same |
 | `Finding.bugKey` / `bugNumber` | the `Counter` collection allocates them with an atomic `findAndModify` — **stronger** than an index, because it cannot hand out the same number twice in the first place |
-| `Ticket.externalRequestId` | `pushToTracker()` re-reads the row on entry and returns the existing issue |
 
 The API shape is unchanged: `results.controller.ts` and `test-cases.service.ts` collapse
 `findings[0]` back to `finding` before responding, because the one-to-many is a storage detail

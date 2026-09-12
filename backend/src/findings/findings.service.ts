@@ -57,9 +57,6 @@ export class FindingsService {
         run: { select: { id: true, name: true, targetUrl: true } },
         // The card renders the audit trail inline, so it ships with the list.
         events: { orderBy: { createdAt: 'asc' } },
-        ticket: {
-          select: { id: true, key: true, status: true, externalKey: true, externalUrl: true },
-        },
         result: {
           select: {
             id: true,
@@ -92,12 +89,6 @@ export class FindingsService {
         run: { select: { id: true, name: true, targetUrl: true, requirements: true } },
         result: { include: { consoleLogs: true, networkLogs: true } },
         events: { orderBy: { createdAt: 'asc' } },
-        ticket: {
-          include: {
-            assignee: { select: { id: true, name: true, email: true } },
-            reporter: { select: { id: true, name: true, email: true } },
-          },
-        },
       },
     });
     if (!finding) throw new NotFoundException(`Finding ${id} not found`);

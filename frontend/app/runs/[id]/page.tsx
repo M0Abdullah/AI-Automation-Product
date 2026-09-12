@@ -13,7 +13,6 @@ import { RunPagesPanel } from '../../../components/RunPagesPanel';
 import {
   ApiError,
   POLL_INTERVAL_MS,
-  approveAllTestCases,
   executeRun,
   getRun,
   replanRun,
@@ -111,7 +110,6 @@ export default function RunPage() {
   }
 
   const s = run.summary;
-  const pending = run.testCases.filter((c) => !c.approved && !c.rejected);
   const openFindings = run.findings.filter((f) =>
     ['NEW', 'TRIAGED', 'REOPENED'].includes(f.status),
   );
@@ -166,28 +164,17 @@ export default function RunPage() {
           </div>
 
           <div className="row">
-            {pending.length > 0 && (
+            {/* Re-run only. The first run starts on its own — see the pipeline. */}
+            {hasRun && (
               <button
-                className="btn"
-                disabled={busy !== null}
-                onClick={() => act('approveAll', () => approveAllTestCases(run.id))}
+                className="btn btn-primary btn-lg"
+                disabled={busy !== null || s.approvedCases === 0 || inProgress}
+                onClick={() => act('execute', () => executeRun(run.id))}
               >
-                {busy === 'approveAll' ? <span className="spinner" /> : null} Approve all (
-                {pending.length})
+                {busy === 'execute' || inProgress ? <span className="spinner" /> : null}
+                {inProgress ? 'Running…' : `Run again (${s.approvedCases})`}
               </button>
             )}
-            <button
-              className="btn btn-primary btn-lg"
-              disabled={busy !== null || s.approvedCases === 0 || inProgress}
-              onClick={() => act('execute', () => executeRun(run.id))}
-            >
-              {busy === 'execute' || inProgress ? <span className="spinner" /> : null}
-              {inProgress
-                ? 'Running…'
-                : hasRun
-                  ? `Run again (${s.approvedCases})`
-                  : `Run ${s.approvedCases} test${s.approvedCases === 1 ? '' : 's'}`}
-            </button>
           </div>
         </div>
 
@@ -248,22 +235,17 @@ export default function RunPage() {
                 </button>
               </div>
             </div>
-          ) : pending.length > 0 ? (
-            <div className="banner banner-warn">
-              <div>
-                <strong>
-                  Step 1 — check the {pending.length} test{pending.length === 1 ? '' : 's'} below,
-                  then press Approve all.
-                </strong>
-                <div style={{ fontWeight: 400, marginTop: 2 }}>
-                  Nothing runs until you approve. Then press the blue Run button.
-                </div>
-              </div>
-            </div>
           ) : !hasRun ? (
             <div className="banner banner-info">
               <div>
-                <strong>Ready. Press the blue Run button.</strong>
+                <strong>
+                  {run.testCases.length > 0
+                    ? `${run.testCases.length} test${run.testCases.length === 1 ? '' : 's'} written — running them now.`
+                    : 'Reading your page and writing the tests.'}
+                </strong>
+                <div style={{ fontWeight: 400, marginTop: 2 }}>
+                  You can close this tab. The results are emailed to you when it finishes.
+                </div>
               </div>
             </div>
           ) : allGood ? (

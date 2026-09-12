@@ -4,7 +4,6 @@ import { AppConfigService } from '../config/app-config.service';
 import { LlmService } from '../llm/llm.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { TrackerService } from '../trackers/tracker.service';
 import { CHECK_CATALOG } from './check-catalog';
 import { ALLOWED_ACTIONS, ALLOWED_ASSERTIONS } from './test-plan.types';
 
@@ -19,7 +18,6 @@ export class SystemController {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly llm: LlmService,
-    private readonly trackers: TrackerService,
     private readonly mail: MailService,
   ) {}
 
@@ -59,17 +57,15 @@ export class SystemController {
    * WHAT THIS INSTANCE IS CONNECTED TO.
    *
    * Deliberately reports only booleans and non-secret identifiers — a host, a
-   * project key, a From address. No token, no password, not even a masked one:
-   * a masked secret still leaks its length, and this endpoint is readable by
+   * port, a From address. No token, no password, not even a masked one: a
+   * masked secret still leaks its length, and this endpoint is readable by
    * every signed-in role including VIEWER.
    */
   @Get('integrations')
   integrations() {
     const mail = this.config.mail;
-    const tracker = this.trackers.status();
 
     return {
-      tracker,
       mail: {
         enabled: mail.enabled,
         host: mail.host || null,
@@ -79,8 +75,9 @@ export class SystemController {
         // email" is answerable without reading the server's env.
         events: {
           onLogin: mail.onLogin,
+          onUserJoined: mail.onUserJoined,
+          onRunStarted: mail.onRunStarted,
           onRunFinished: mail.onRunFinished,
-          onBugFiled: mail.onBugFiled,
         },
         appUrl: mail.appUrl,
       },

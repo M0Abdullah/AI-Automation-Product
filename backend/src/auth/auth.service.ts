@@ -79,6 +79,7 @@ export class AuthService {
 
     this.logger.log(`Registered ${user.email} as ${user.role}`);
     this.notifySignIn(user, meta, true);
+    this.notifyOwnersOfSignup(user, meta, userCount === 0);
     return this.issueTokens(user, meta);
   }
 
@@ -220,6 +221,56 @@ export class AuthService {
       userAgent: meta.userAgent,
       isFirstLogin,
     });
+  }
+
+  /**
+   * TELL THE OWNERS SOMEBODY JOINED.
+   *
+   * Separate from notifySignIn, and deliberately so: that one goes to the
+   * person who just signed in, which means nobody running the instance ever
+   * learns that an account was created. On an instance with open registration
+   * that is precisely the event they need to see.
+   *
+   * Fire-and-forget for the same reason as every other notification — an SMTP
+   * outage must not be able to fail a registration.
+   */
+  private notifyOwnersOfSignup(
+    user: { id: string; email: string; name: string; role: string },
+    meta: { userAgent?: string; ip?: string },
+    isFirstAccount: boolean,
+  ): void {
+    if (!this.config.mail.onUserJoined) return;
+
+    void (async () => {
+      try {
+        const owners = await this.prisma.user.findMany({
+          where: { role: UserRole.OWNER, isActive: true },
+          select: { id: true, name: true, email: true },
+        });
+
+        // On the very first registration the new user IS the only owner, so
+        // mailing "somebody joined" to themselves would be absurd. Their
+        // welcome email already covers it.
+        const recipients = owners.filter((o) => o.id !== user.id);
+        if (!recipients.length) return;
+
+        for (const owner of recipients) {
+          await this.mail.sendUserJoined({
+            to: owner.email,
+            ownerName: owner.name,
+            newUserName: user.name,
+            newUserEmail: user.email,
+            role: user.role,
+            at: new Date(),
+            ipAddress: meta.ip,
+            userAgent: meta.userAgent,
+            isFirstAccount,
+          });
+        }
+      } catch (err) {
+        this.logger.warn(`Could not send the new-account email for ${user.email}: ${String(err)}`);
+      }
+    })();
   }
 
   private async issueTokens(

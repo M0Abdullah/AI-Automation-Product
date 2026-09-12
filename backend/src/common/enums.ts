@@ -18,8 +18,8 @@ export const RunStatus = {
   SCAN_FAILED: 'SCAN_FAILED', // page unreachable / blocked / empty
   PLANNING: 'PLANNING', // LLM is writing test cases
   PLAN_FAILED: 'PLAN_FAILED', // LLM error, or everything rejected by policy
-  AWAITING_APPROVAL: 'AWAITING_APPROVAL', // QA must approve before execution
-  RUNNING: 'RUNNING', // Playwright is executing approved cases
+  AWAITING_APPROVAL: 'AWAITING_APPROVAL', // legacy: kept so old rows still render
+  RUNNING: 'RUNNING', // Playwright is executing the planned cases
   COMPLETED: 'COMPLETED', // execution finished (may contain failures)
 } as const;
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
@@ -146,8 +146,8 @@ export function isFindingStatus(v: unknown): v is FindingStatus {
  * WHO CAN DO WHAT.
  *
  * OWNER  - everything, including managing users
- * QA     - create runs, approve tests, triage findings, manage tickets
- * DEV    - view everything, comment, move a ticket to Ready for Retest
+ * QA     - create runs, edit and re-run tests, triage findings
+ * DEV    - view everything
  * VIEWER - read only
  */
 export const UserRole = {
@@ -158,34 +158,8 @@ export const UserRole = {
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
-/** Roles allowed to change test plans, triage findings and manage tickets. */
+/** Roles allowed to change test plans and triage findings. */
 export const WRITE_ROLES: UserRole[] = [UserRole.OWNER, UserRole.QA];
-
-/**
- * TICKET LIFECYCLE.
- *
- * READY_FOR_RETEST is the important one: it is the handoff back to QA, and it is
- * where the "rerun the linked test" button lives.
- */
-export const TicketStatus = {
-  OPEN: 'OPEN',
-  IN_PROGRESS: 'IN_PROGRESS',
-  READY_FOR_RETEST: 'READY_FOR_RETEST',
-  RESOLVED: 'RESOLVED',
-  REOPENED: 'REOPENED',
-  CLOSED: 'CLOSED',
-} as const;
-export type TicketStatus = (typeof TicketStatus)[keyof typeof TicketStatus];
-
-/** Legal ticket moves. Enforced by TicketsService, not assumed. */
-export const TICKET_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
-  OPEN: ['IN_PROGRESS', 'CLOSED'],
-  IN_PROGRESS: ['READY_FOR_RETEST', 'OPEN', 'CLOSED'],
-  READY_FOR_RETEST: ['RESOLVED', 'REOPENED', 'IN_PROGRESS'],
-  RESOLVED: ['CLOSED', 'REOPENED'],
-  REOPENED: ['IN_PROGRESS', 'CLOSED'],
-  CLOSED: ['REOPENED'],
-};
 
 export const Priority = {
   P0: 'P0',
@@ -220,5 +194,4 @@ export type DesignIssueGroup = (typeof DesignIssueGroup)[keyof typeof DesignIssu
 /** Counter names used for human-readable keys. */
 export const CounterName = {
   BUG: 'bug',
-  TICKET: 'ticket',
 } as const;

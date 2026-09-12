@@ -90,9 +90,7 @@ export function TestCaseCard({
       ? 'var(--pass)'
       : testCase.rejected
         ? 'var(--neutral)'
-        : testCase.approved
-          ? 'var(--brand)'
-          : 'var(--warn)';
+        : 'var(--brand)';
 
   return (
     <div
@@ -129,24 +127,14 @@ export function TestCaseCard({
           <PriorityBadge priority={testCase.priority} />
           <span style={{ fontWeight: 570, minWidth: 0 }}>{testCase.title}</span>
           {latest && <ResultStatusBadge status={latest.status} />}
-          {!latest && testCase.approved && <span className="badge badge-brand">approved</span>}
-          {!latest && !testCase.approved && !testCase.rejected && (
-            <span className="badge badge-warn badge-plain">needs review</span>
+          {!latest && !testCase.rejected && (
+            <span className="badge badge-brand badge-plain">queued</span>
           )}
           {testCase.rejected && <span className="badge badge-neutral">skipped</span>}
           {testCase.destructive && <span className="badge badge-fail">risky</span>}
         </button>
 
         <div className="row" style={{ gap: 6 }}>
-          {canWrite && !testCase.approved && !testCase.rejected && (
-            <button
-              className="btn btn-sm btn-primary"
-              disabled={busy !== null}
-              onClick={() => act('approve', () => approveTestCase(testCase.id))}
-            >
-              {busy === 'approve' ? <span className="spinner" /> : null} Approve
-            </button>
-          )}
           {canWrite && !testCase.rejected && (
             <button
               className="btn btn-sm btn-ghost"

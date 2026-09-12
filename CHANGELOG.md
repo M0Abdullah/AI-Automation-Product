@@ -6,6 +6,92 @@ All notable changes to this project. Format follows
 
 ---
 
+## [0.4.0] — 2026-09-12
+
+The release that removes the waiting. A run now goes from URL to results with
+nothing to press in between, and the result arrives by email with the failures
+spelled out in it.
+
+### Changed
+
+**Runs start themselves.** Planning no longer stops at `AWAITING_APPROVAL`.
+Accepted cases are written approved and the pipeline calls `startExecution`
+directly, so `POST /runs` scans, plans and executes as one uninterrupted
+movement. `POST /runs/:id/execute` still exists and is now purely a **re-run**.
+
+Removing the gate was a decision, not a shortcut. It had been defended as the
+platform's safety argument, but it was the weakest of the four layers: the
+button people actually pressed was *Approve all*, on forty cases nobody read.
+What it reliably added was latency — a planned run sat idle until somebody
+noticed it, and the "tests are ready" email existed only to paper over that.
+
+Safety did not move, because it was never in the click. `PolicyService` already
+rejected any step leaving the target's origin, exceeding the step budget,
+carrying no assertion, or touching a destructive keyword — on every run,
+watched or not. **Destructive cases still require `allowDestructive` on the
+run**, which is a decision made before the run starts. That is the real gate.
+
+Cases can still be edited or excluded, and edits are still re-validated by the
+policy engine.
+
+**The finish email carries the failures, not just the counts.** Since this
+email is now usually the first thing you see about a run, `3 failed` would
+force a login just to learn whether it can wait. Each failure now arrives with
+its name, its page, the executor's reason, and the console errors and failed
+API calls captured at the moment it broke. The reason comes from the assertion
+that did not hold — never from the AI's triage guess.
+
+### Added
+
+**"Somebody joined" email, to the owners.** The sign-in alert goes to the
+person signing in, which meant nobody running an instance ever learned that an
+account had been created — the one event that matters on an instance with open
+registration. Sent on registration only, never on login. `MAIL_ON_USER_JOINED`.
+
+### Removed
+
+**Tickets, and the Jira / ClickUp / Linear integration.** Assignment,
+lifecycle, comments, retest handoff, the bug-report PDF/HTML/Markdown export
+and all three tracker providers are gone, along with `TICKET-001` and every
+`TRACKER_*`, `JIRA_*`, `CLICKUP_*` and `LINEAR_*` setting.
+
+A failure is still a **finding**: what broke, why, and the evidence. What it no
+longer does is decide that the finding is a defect, give it an owner and file
+it somewhere. That judgement was always the user's, and the machinery around it
+was most of the product's surface area for a step a person still had to take.
+
+Findings, `BUG-001` numbering, triage and the audit trail are unchanged.
+
+**The "tests are ready for approval" email**, which had nothing left to
+announce.
+
+**Release on push.** CI gained a `release` job that runs after the backend
+build, the frontend build and the secret scan all pass. It reads the version out
+of `package.json` and, if that version has never been tagged, tags the commit it
+just built and publishes the GitHub release with the matching `CHANGELOG.md`
+section as the notes.
+
+A release is therefore a version bump plus a changelog entry — a two-line diff
+anyone can raise as a PR and anyone can review, needing no local tooling and no
+tag-push permission. Pushes that do not touch the version release nothing, which
+is the point: a tag per commit makes the tag list useless.
+
+`scripts/release.ps1` no longer tags or calls `gh release create`. It runs the
+checks locally, verifies `CHANGELOG.md` documents the version, bumps both
+`package.json` files, commits and pushes — then hands over. Two things creating
+tags is how a tag ends up on one commit and its release on another, so tagging
+now lives in exactly one place: the one that has just proven the build is green
+on a clean machine.
+
+Needs *Settings → Actions → General → Workflow permissions → Read and write*.
+No secret or token to configure; `GITHUB_TOKEN` is issued to the run.
+
+### Housekeeping
+
+Root directory tidied: six unreferenced UI preview PNGs removed,
+`kill-ports.ps1` moved into `scripts/` beside the other operational scripts,
+and `frontend/tsconfig.tsbuildinfo` untracked (`*.tsbuildinfo` now ignored).
+
 ## [0.3.0] — 2026-09-10
 
 The release that turns a single-page prototype into something a team can point

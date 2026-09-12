@@ -118,36 +118,6 @@ export class AppConfigService {
     };
   }
 
-  // --- issue tracker ---
-  /**
-   * Every provider's settings are read regardless of which one is selected, so
-   * switching TRACKER_PROVIDER needs no code change and a misconfigured
-   * provider can report exactly which variables it is missing.
-   */
-  get tracker() {
-    return {
-      provider: this.get('TRACKER_PROVIDER'),
-      autoPush: this.get('TRACKER_AUTO_PUSH'),
-      timeoutMs: this.get('TRACKER_TIMEOUT_MS'),
-      jira: {
-        baseUrl: this.get('JIRA_BASE_URL').trim().replace(/\/+$/, ''),
-        email: this.get('JIRA_EMAIL').trim(),
-        apiToken: this.get('JIRA_API_TOKEN').trim(),
-        projectKey: this.get('JIRA_PROJECT_KEY').trim().toUpperCase(),
-        issueType: this.get('JIRA_ISSUE_TYPE').trim() || 'Bug',
-      },
-      clickup: {
-        apiToken: this.get('CLICKUP_API_TOKEN').trim(),
-        listId: this.get('CLICKUP_LIST_ID').trim(),
-        status: this.get('CLICKUP_STATUS').trim(),
-      },
-      linear: {
-        apiKey: this.get('LINEAR_API_KEY').trim(),
-        team: this.get('LINEAR_TEAM').trim(),
-      },
-    };
-  }
-
   // --- email ---
   /**
    * `enabled` is the only thing callers should test. It folds together the
@@ -168,10 +138,9 @@ export class AppConfigService {
       timeoutMs: this.get('MAIL_TIMEOUT_MS'),
       appUrl: this.get('APP_PUBLIC_URL'),
       onLogin: this.get('MAIL_ON_LOGIN'),
+      onUserJoined: this.get('MAIL_ON_USER_JOINED'),
       onRunStarted: this.get('MAIL_ON_RUN_STARTED'),
-      onTestsReady: this.get('MAIL_ON_TESTS_READY'),
       onRunFinished: this.get('MAIL_ON_RUN_FINISHED'),
-      onBugFiled: this.get('MAIL_ON_BUG_FILED'),
     };
   }
 

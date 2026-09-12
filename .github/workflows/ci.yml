@@ -17,9 +17,19 @@ on:
     branches: ['main']
 
 # A new push supersedes an in-flight run on the same ref.
+#
+# EXCEPT once a release is being cut: `cancel-in-progress` would be free to kill
+# the release job between `git tag` and `gh release create`, leaving a tag on
+# the remote with no release attached and the next push skipping it as "already
+# released". Releases are keyed on the version instead of the ref so they never
+# queue behind each other anyway.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Read-only by default. The release job widens this for itself alone.
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -122,3 +132,107 @@ jobs:
           fi
           if [ "$found" -ne 0 ]; then exit 1; fi
           echo "No credential patterns in tracked files."
+
+  # =========================================================================
+  # RELEASE ON PUSH.
+  #
+  # Cut from the VERSION IN package.json, not from every push: a release per
+  # commit would make the tag list useless and "which version is on staging"
+  # unanswerable. So this job runs on every push to main and does nothing at all
+  # unless the version is one that has never been tagged.
+  #
+  # That makes releasing a one-line change any contributor can make and review
+  # in a PR - bump the version, write the changelog entry - with no local tooling
+  # and no push permissions beyond merging.
+  #
+  # It runs LAST and only on green. `needs` is the whole safety argument: a
+  # release that ships a broken build is worse than no release, and worse still
+  # is one that ships a leaked credential, so the secret scan gates it too.
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, secrets]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    # Only this job can write, and only to contents (tags and releases).
+    permissions:
+      contents: write
+
+    steps:
+      # Tags are needed to answer "has this version already shipped?", and
+      # actions/checkout fetches none of them by default.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # THE TWO package.json FILES MUST AGREE.
+      #
+      # They are bumped together by scripts/release.ps1, but a hand-edit can
+      # touch one and miss the other - and then "what version is this?" has two
+      # answers and the tag picks one arbitrarily. Cheap to check, confusing
+      # forever if it slips through.
+      - name: Read and verify the version
+        id: version
+        run: |
+          set -euo pipefail
+          be=$(node -p "require('./backend/package.json').version")
+          fe=$(node -p "require('./frontend/package.json').version")
+          if [ "$be" != "$fe" ]; then
+            echo "::error::backend is $be but frontend is $fe - bump both."
+            exit 1
+          fi
+          echo "version=$be" >> "$GITHUB_OUTPUT"
+          echo "tag=v$be" >> "$GITHUB_OUTPUT"
+          echo "Version is $be"
+
+      - name: Has this version already been released?
+        id: check
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$tag is already tagged - nothing to release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "$tag is new - releasing."
+          fi
+
+      # THE NOTES ARE THE CHANGELOG SECTION FOR THIS VERSION, and nothing else.
+      #
+      # Not --generate-notes: a list of commit subjects describes what was
+      # touched, not what changed for the user. If the version has no changelog
+      # entry that is an omission worth failing on - a release nobody documented
+      # is one nobody can evaluate.
+      - name: Extract the release notes
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          v="${{ steps.version.outputs.version }}"
+          awk -v hdr="## [$v]" '
+            index($0, hdr) == 1 { inside = 1; next }
+            inside && /^## \[/ { exit }
+            inside              { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::CHANGELOG.md has no '## [$v]' section. Add one before releasing."
+            exit 1
+          fi
+          echo "--- notes ---"
+          cat RELEASE_NOTES.md
+
+      - name: Tag and publish
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.version.outputs.tag }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Annotated, and pointing at the commit that was actually built and
+          # scanned above - not at whatever main has drifted to since.
+          git tag -a "$tag" -m "Release $tag" "$GITHUB_SHA"
+          git push origin "$tag"
+          gh release create "$tag" --title "$tag" --notes-file RELEASE_NOTES.md --target "$GITHUB_SHA"
+          echo "Released $tag"

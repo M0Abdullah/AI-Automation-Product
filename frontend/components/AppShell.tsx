@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { getFindingStats, getHealth, getTicketStats } from '../lib/api';
+import { getFindingStats, getHealth } from '../lib/api';
 import { ROLE_LABEL } from '../lib/auth';
 import { useAuth } from './AuthProvider';
 import { ThemeToggle } from './ThemeToggle';
 import {
   IconAlert,
-  IconBug,
   IconDashboard,
   IconHistory,
   IconPlus,
@@ -64,14 +63,6 @@ const NAV = [
     group: 'Bugs',
   },
   {
-    href: '/tickets',
-    label: 'Bug tickets',
-    hint: 'Assigned to developers',
-    Icon: IconBug,
-    counter: 'tickets' as const,
-    group: 'Bugs',
-  },
-  {
     href: '/account',
     label: 'Settings',
     hint: 'Your account and team',
@@ -86,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading } = useAuth();
 
-  const [counts, setCounts] = useState({ findings: 0, tickets: 0 });
+  const [counts, setCounts] = useState({ findings: 0 });
 
   useEffect(() => {
     if (!user) return;
@@ -94,13 +85,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     const load = async () => {
       try {
-        const [f, t] = await Promise.all([getFindingStats(), getTicketStats()]);
+        const f = await getFindingStats();
         if (cancelled) return;
-        setCounts({
-          // Only the queues that need a human today.
-          findings: (f.NEW ?? 0) + (f.REOPENED ?? 0),
-          tickets: (t.OPEN ?? 0) + (t.READY_FOR_RETEST ?? 0) + (t.REOPENED ?? 0),
-        });
+        // Only the queue that needs a human today.
+        setCounts({ findings: (f.NEW ?? 0) + (f.REOPENED ?? 0) });
       } catch {
         /* badges are decoration - never block the shell on them */
       }

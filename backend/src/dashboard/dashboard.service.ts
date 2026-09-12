@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
  *
  * The numbers are chosen to answer four questions a QA lead actually asks:
  *   1. Is the suite healthy?        -> pass rate, flaky count
- *   2. What needs me today?         -> findings awaiting triage, tickets to retest
+ *   2. What needs me today?         -> findings awaiting triage
  *   3. What did we find?            -> confirmed bugs by severity
  *   4. Is the tooling itself okay?  -> test defects vs product bugs
  */
@@ -25,26 +25,14 @@ export class DashboardService {
     const mine = scope === 'mine';
     const runWhere = mine ? { createdById: userId } : {};
     const viaRun = mine ? { run: { createdById: userId } } : {};
-    const ticketWhere = mine
-      ? {
-          OR: [
-            { finding: { run: { createdById: userId } } },
-            { assigneeId: userId },
-            { reporterId: userId },
-          ],
-        }
-      : {};
-
     const [
       runCount,
       runsByStatus,
       testCases,
       findingsByStatus,
-      ticketsByStatus,
       confirmedFindings,
       recentRuns,
       needsTriage,
-      needsRetest,
       llmUsage,
     ] = await Promise.all([
       this.prisma.run.count({ where: runWhere }),
@@ -69,7 +57,6 @@ export class DashboardService {
       }),
 
       this.prisma.finding.groupBy({ by: ['status'], where: viaRun, _count: true }),
-      this.prisma.ticket.groupBy({ by: ['status'], where: ticketWhere, _count: true }),
 
       this.prisma.finding.findMany({
         where: { status: { in: ['CONFIRMED', 'REOPENED'] }, ...viaRun },
@@ -107,20 +94,6 @@ export class DashboardService {
         },
       }),
 
-      this.prisma.ticket.findMany({
-        where: { status: { in: ['OPEN', 'READY_FOR_RETEST', 'REOPENED'] }, ...ticketWhere },
-        orderBy: { updatedAt: 'desc' },
-        take: 5,
-        select: {
-          id: true,
-          key: true,
-          title: true,
-          status: true,
-          priority: true,
-          assignee: { select: { name: true } },
-        },
-      }),
-
       this.prisma.run.aggregate({
         where: runWhere,
         _sum: { llmTokensIn: true, llmTokensOut: true },
@@ -152,7 +125,6 @@ export class DashboardService {
       },
       tests: {
         total: testCases.length,
-        approved: testCases.filter((t) => t.approved && !t.rejected).length,
         humanEdited: testCases.filter((t) => t.source === 'MANUAL').length,
         executed,
         passed,
@@ -169,21 +141,12 @@ export class DashboardService {
         bySeverity: tally(confirmedFindings.map((f) => f.severity ?? 'UNSET')),
         byClassification: tally(classifications),
       },
-      tickets: {
-        byStatus: toCounts(ticketsByStatus),
-        open:
-          countOf(ticketsByStatus, 'OPEN') +
-          countOf(ticketsByStatus, 'IN_PROGRESS') +
-          countOf(ticketsByStatus, 'REOPENED'),
-        readyForRetest: countOf(ticketsByStatus, 'READY_FOR_RETEST'),
-      },
       llm: {
         tokensIn: llmUsage._sum.llmTokensIn ?? 0,
         tokensOut: llmUsage._sum.llmTokensOut ?? 0,
       },
       recentRuns,
       needsTriage,
-      needsRetest,
     };
   }
 }

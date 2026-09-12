@@ -472,7 +472,6 @@ model Finding {
   updatedAt   DateTime @updatedAt
 
   events FindingEvent[]
-  ticket Ticket?
 
   @@index([runId, status])
   @@index([signature])
@@ -545,9 +544,6 @@ model User {
 
   sessions        LoginSession[]
   createdRuns     Run[]           @relation("runCreator")
-  assignedTickets Ticket[]        @relation("ticketAssignee")
-  reportedTickets Ticket[]        @relation("ticketReporter")
-  ticketComments  TicketComment[]
 
   @@map("users")
 }
@@ -571,99 +567,7 @@ model LoginSession {
   @@map("login_sessions")
 }
 
-// ===========================================================================
-// TICKETS
-//
-// A ticket is created FROM a confirmed finding, prefilled with the evidence the
-// run already captured. The finding stays the QA record; the ticket is the
-// developer-facing work item with an assignee and a lifecycle.
-// ===========================================================================
-
-model Ticket {
-  id     String @id @map("_id") @default(uuid())
-  /// Human-readable key, e.g. TICKET-001. What people say out loud.
-  key    String @unique
-  number Int    @unique
-
-  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  findingId String  @unique
-
-  title       String
-  description String
-
-  /// TicketStatus - OPEN | IN_PROGRESS | READY_FOR_RETEST | RESOLVED | REOPENED | CLOSED
-  status   String    @default("OPEN")
-  /// Priority is a separate axis from severity: how soon vs how bad.
-  priority String    @default("P2")
-  severity String?
-  module   String?
-  build    String?
-  labels   String[]  @default([])
-  dueDate  DateTime?
-
-  assignee   User?   @relation("ticketAssignee", fields: [assigneeId], references: [id])
-  assigneeId String?
-  reporter   User?   @relation("ticketReporter", fields: [reporterId], references: [id])
-  reporterId String?
-
-  // --- external tracker (Jira / Linear / GitHub), filled by the connector ---
-  externalKey       String?
-  externalUrl       String?
-  externalProvider  String?
-  externalSyncedAt  DateTime?
-  /// Idempotency key so a double-click cannot create two Jira issues.
-  ///
-  /// Not @unique, again because it is optional: every ticket that has not been
-  /// pushed leaves it unset, and a non-sparse unique index would allow only one
-  /// such ticket. pushToTracker claims it before calling out and re-reads the
-  /// row on entry, which is what actually prevents the double-create.
-  externalRequestId String?
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  resolvedAt DateTime?
-  closedAt   DateTime?
-
-  comments TicketComment[]
-  events   TicketEvent[]
-
-  @@index([status, priority])
-  @@index([externalRequestId])
-  @@map("tickets")
-}
-
-model TicketComment {
-  id       String @id @map("_id") @default(uuid())
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  ticketId String
-
-  author    User?    @relation(fields: [authorId], references: [id])
-  authorId  String?
-  body      String
-  createdAt DateTime @default(now())
-
-  @@index([ticketId, createdAt])
-  @@map("ticket_comments")
-}
-
-/// Append-only audit trail for a ticket: every field change, with who and when.
-model TicketEvent {
-  id       String @id @map("_id") @default(uuid())
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  ticketId String
-
-  field     String // status | assignee | priority | severity | comment | created
-  fromValue String?
-  toValue   String?
-  actor     String   @default("system")
-  note      String?
-  createdAt DateTime @default(now())
-
-  @@index([ticketId, createdAt])
-  @@map("ticket_events")
-}
-
-/// Atomic sequence generator for human-readable keys (BUG-001, TICKET-001).
+/// Atomic sequence generator for human-readable keys (BUG-001).
 /// Counting rows races under concurrency; findAndModify on one document does not.
 model Counter {
   name  String @id @map("_id")

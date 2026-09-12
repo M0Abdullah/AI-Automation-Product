@@ -142,30 +142,6 @@ export const envSchema = z.object({
   CRAWL_MAX_PAGES_HARD: int(50, 1),
   CRAWL_MAX_DEPTH_HARD: int(5, 1),
 
-  // --- issue tracker (Jira / ClickUp / Linear) -----------------------------
-  // Which tracker confirmed bugs are filed into. 'none' keeps everything local.
-  TRACKER_PROVIDER: z.enum(['none', 'jira', 'clickup', 'linear']).default('none'),
-  // Push automatically when a HUMAN confirms a finding and a ticket is created.
-  // Never on a bare test failure - see the comment in tracker.service.ts.
-  TRACKER_AUTO_PUSH: bool(false),
-  TRACKER_TIMEOUT_MS: int(20000, 1000),
-
-  // Jira Cloud. The token is an API token, NOT the account password.
-  JIRA_BASE_URL: z.string().default(''),
-  JIRA_EMAIL: z.string().default(''),
-  JIRA_API_TOKEN: z.string().default(''),
-  JIRA_PROJECT_KEY: z.string().default(''),
-  JIRA_ISSUE_TYPE: z.string().default('Bug'),
-
-  // ClickUp. LIST id, not a Space or Folder id.
-  CLICKUP_API_TOKEN: z.string().default(''),
-  CLICKUP_LIST_ID: z.string().default(''),
-  CLICKUP_STATUS: z.string().default(''),
-
-  // Linear. LINEAR_TEAM accepts the team key ("ENG") or its UUID.
-  LINEAR_API_KEY: z.string().default(''),
-  LINEAR_TEAM: z.string().default(''),
-
   // --- email notifications -------------------------------------------------
   // Off by default: the platform must run with no mail server at all.
   MAIL_ENABLED: bool(false),
@@ -188,13 +164,12 @@ export const envSchema = z.object({
   // Which notifications to send. Separate switches because they have very
   // different audiences: a sign-in alert is security, a run summary is work.
   MAIL_ON_LOGIN: bool(true),
+  // "Somebody created an account." Goes to the OWNERS, not the new user.
+  MAIL_ON_USER_JOINED: bool(true),
   // "We have started, N pages found." Sent after discovery, not on the click.
   MAIL_ON_RUN_STARTED: bool(true),
-  // "N tests are waiting for you." The run PAUSES here, so this one matters
-  // most - without it a run can sit unapproved indefinitely.
-  MAIL_ON_TESTS_READY: bool(true),
+  // "Here is everything that failed, and why." The one that carries the result.
   MAIL_ON_RUN_FINISHED: bool(true),
-  MAIL_ON_BUG_FILED: bool(true),
 });
 
 export type Env = z.infer<typeof envSchema>;

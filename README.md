@@ -2,9 +2,9 @@
 
 # AI Testing Platform
 
-**Paste a URL. Tick what to check. Get real browser tests across your whole app, run in Chrome, with bug reports.**
+**Paste a staging URL. Tick what to check. It tests your whole app in real Chrome and emails you everything that broke.**
 
-No test-writing skills needed. A human approves everything before it runs.
+No test-writing skills needed. No buttons to press while it works.
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com)
@@ -21,30 +21,31 @@ No test-writing skills needed. A human approves everything before it runs.
 
 A web app that **tests other websites for you**.
 
-You give it a URL and tick what should be checked. It opens the page in **real Google Chrome**, reads what's on it, asks an AI to write the test cases, and waits for you to approve them. Then it runs them and tells you what broke — with a screenshot, the console errors, and the failed API calls.
+You give it a URL and tick what should be checked. It opens the page in **real Google Chrome**, reads what's on it, asks an AI to write the test cases, and runs them — no approval step, no waiting on you. Then it tells you what broke, with a screenshot, the console errors, and the failed API calls.
 
-Tick **Test the whole app** and it does that for every screen it can reach from that URL, not just the one you pasted — one run, one approval, one bug list.
+Tick **Test the whole app** and it does that for every screen it can reach from that URL, not just the one you pasted — one run, one list of what's broken.
 
-Every failure is a **finding**, not a bug. You decide if it's real. Only then does it get a **BUG-001** number, a PDF report, and a ticket assigned to a developer.
+**It does not file tickets.** A failed test has five possible causes and only one is a bug, so it reports *what* failed and *why* and leaves the judgement to you.
 
 ```
-     You                    Chrome                 AI                  You
-      │                       │                     │                   │
-  paste URL ──────────────► reads the page          │                   │
-  tick checks                 │                     │                   │
-      │                  what's on it ───────────► writes tests         │
-      │                       │                     │                   │
-      │                       │              ┌─ safety gate ─┐          │
-      │                       │              │ every step     │         │
-      │                       │              │ validated      │         │
-      │                       │              └────────────────┘         │
-      │                       │                     └──────────► approve or edit
-      │                       │                                         │
-      │                  runs them ◄────────────────────────────────────┘
+     You                    Chrome                 AI
+      │                       │                     │
+  paste URL ──────────────► reads the page          │
+  tick checks                 │                     │
+      │                  what's on it ───────────► writes tests
+      │                       │                     │
+      │                       │              ┌─ safety gate ──┐
+      │                       │              │ every step     │
+      │                       │              │ validated      │
+      │                       │              │ before it runs │
+      │                       │              └───────┬────────┘
+      │                       │                      │
+      │                  runs them ◄─────────────────┘
       │                       │
-      │                  PASS / FAIL ──────► failure? ──► AI explains ──► you confirm
-      │                                                                    │
-      │                                              BUG-001 → PDF → TICKET-001 → Jira
+      │                  PASS / FAIL
+      │                       │
+      └───────────────────────┴──► EMAIL: what failed, and why
+                                     screenshot · console · failed API calls
 ```
 
 **Three parts, three jobs.** The AI decides *what* to test. The backend validates and stores. Chrome does the clicking and decides PASS/FAIL. The AI never touches the browser and never decides whether a test passed.
@@ -59,7 +60,7 @@ Eleven ready-made checks that work on any page. Writing requirements is optional
 
 ![Start a test](docs/screenshots/02-start-a-test.png)
 
-### 2. Review what the AI wrote — nothing runs until you approve
+### 2. The tests it wrote — visible while they run, nothing to approve
 
 ![Review tests](docs/screenshots/03-review-tests.png)
 
@@ -73,15 +74,9 @@ Its opinion is labelled a suggestion. The screenshot of the moment it broke is r
 
 ![Failures](docs/screenshots/05-failures.png)
 
-### 5. Bug ticket — assigned, tracked, linked to Jira
+### 5. Dashboard — is the suite healthy, and what needs me today
 
-The description is the generated bug report. Nothing retyped.
-
-![Bug ticket](docs/screenshots/06-bug-ticket.png)
-
-### 6. Dashboard — is the suite healthy, and what needs me today
-
-![Dashboard](docs/screenshots/07-dashboard.png)
+![Dashboard](docs/screenshots/06-dashboard.png)
 
 <details>
 <summary>Sign-in screen</summary>
@@ -96,11 +91,11 @@ The description is the generated bug report. Nothing retyped.
 
 | | |
 |---|---|
-| ✅ **Whole-app runs** | Crawls your app and tests every page it finds — one run, one approval gate |
+| ✅ **Whole-app runs** | Crawls your app and tests every page it finds — one run, one list |
 | ✅ **Tick-box checks** | 13 ready-made checks — no test writing required |
 | ✅ **AI test generation** | Plain-English requirements → structured test cases |
 | ✅ **Real Chrome execution** | Not a headless simulation; falls back to Chromium |
-| ✅ **Human approval gate** | Nothing runs until a person approves it |
+| ✅ **Starts on its own** | Paste a URL and it scans, plans and runs. No approval click |
 | ✅ **Deterministic PASS/FAIL** | Assertions decide, never the AI |
 | ✅ **Screenshots + traces** | Full-page capture and frame-by-frame replay |
 | ✅ **Console + API errors** | `POST /api/login → 401` captured automatically |
@@ -109,10 +104,8 @@ The description is the generated bug report. Nothing retyped.
 | ✅ **Wording review** | Typos, grammar and leftover placeholder text in the page copy |
 | ✅ **Design vs Figma** | Sizes, radii, type, weights, **colours**, **icon sizes** and **spacing** checked against a Figma frame |
 | ✅ **AI failure triage** | Whose fault (bug / test / environment) **and** what kind (UI / data / content / technical) |
-| ✅ **Bug reports** | `BUG-001` as PDF, Markdown or HTML |
-| ✅ **Ticket workflow** | Assignee, lifecycle, comments, retest |
-| ✅ **Auto-files in Jira / ClickUp / Linear** | Real issues via API, with the screenshot and trace attached |
-| ✅ **Email notifications** | Sign-in alerts, run summaries, assignment mail |
+| ✅ **Email with the failures in it** | Not "3 failed" — the name, the page, the reason and the evidence for each |
+| ✅ **Email when somebody joins** | The owners are told when an account is created |
 | ✅ **Accounts + roles** | OWNER / QA / DEV / VIEWER, enforced by the API |
 | ✅ **Full audit trail** | Who decided what, and when |
 
@@ -147,7 +140,7 @@ it finds**.
 ```
 Entry     https://staging.yoursite.com/dashboard
 Found     /dashboard  /employees  /employees/new  /attendance  /reports  /settings  …
-Result    1 run · 1 approval gate · 1 findings list
+Result    1 run · 1 findings list · 1 email
 ```
 
 It is a bounded crawler, not a web spider, because every extra page costs a browser scan and an
@@ -173,7 +166,7 @@ Pages          12 discovered · 9 tests written · 2 could not be read · 1 skip
   /audit-log      Skipped — the run reached its 60-case limit before this page was planned
 ```
 
-That count is shown on the **Tests** tab too, next to the approve button. A suite that reports
+That count is shown on the **Tests** tab too. A suite that reports
 itself green while a quarter of the app was never opened is the one dishonest thing whole-app
 testing could do, so it is stated where it cannot be missed.
 
@@ -197,7 +190,7 @@ Target   https://app.example.com/employee/attendance
 Sign-in  https://app.example.com/login
 ```
 
-The sign-in is **not** a test case: it's deterministic, it can't be approved away, and it never appears in the results as a pass or a fail. The captured session is encrypted at rest, re-established if it goes stale, and wiped when the run finishes.
+The sign-in is **not** a test case: it's deterministic, and it never appears in the results as a pass or a fail. The captured session is encrypted at rest, re-established if it goes stale, and wiped when the run finishes.
 
 ### ✍️ Wording review — typos, grammar, leftover placeholder text
 
@@ -292,130 +285,6 @@ Those last two are independent axes, and a triager needs both. A defect can be `
 
 ---
 
-## 🎫 Filing bugs in Jira, ClickUp or Linear
-
-A confirmed defect becomes a **real issue in your tracker**, created through the API — not a link
-you paste by hand. The bug report goes in as the description, and the **failure screenshot and
-Playwright trace are uploaded as attachments**, so a developer never has to open this tool.
-
-```
-Test fails
-   │
-   ├─ re-run once in a clean browser        (is it even reproducible?)
-   │
-   ├─ AI suggests a cause, labelled as a suggestion
-   │
-   └─ A HUMAN confirms it is a real defect  ◄── the gate
-          │
-          ├─ BUG-007 assigned  ──►  TICKET-004 created
-          │
-          └─ filed as  QA-142 in Jira   (or a ClickUp task, or ENG-88 in Linear)
-                 with the report, the screenshot and the trace
-```
-
-### Why it does not file on failure
-
-This is the one place this product deliberately behaves differently from the tools it competes
-with. A failing test has **five** possible causes and only one of them is a bug:
-
-```
-FAIL
- ├─ PRODUCT BUG        the app is genuinely broken      ◄── the only one worth filing
- ├─ TEST DEFECT        the AI's generated locator was wrong
- ├─ ENVIRONMENT ISSUE  site down, cert expired, third-party outage
- ├─ TEST DATA ISSUE    the test user was already consumed
- └─ FLAKY              timing, not reproducible
-```
-
-A tool that files automatically on failure spends its first week filling your backlog with its own
-mistakes — and after that, nobody trusts anything it files. So the **trigger is a human
-confirming the finding**. After that point nothing else is manual: with `TRACKER_AUTO_PUSH=true`
-the issue is created the moment the bug is confirmed, no extra click.
-
-### Setting it up
-
-Pick one provider in `backend/.env`. Restart the backend, then press **Test** on the Integrations
-panel (Account page) — it checks the credentials without filing a junk issue into your real
-backlog.
-
-<details>
-<summary><b>Jira Cloud</b></summary>
-
-```ini
-TRACKER_PROVIDER=jira
-TRACKER_AUTO_PUSH=true
-
-JIRA_BASE_URL=https://yourteam.atlassian.net
-JIRA_EMAIL=you@yourcompany.com
-JIRA_API_TOKEN=ATATT...
-JIRA_PROJECT_KEY=QA
-JIRA_ISSUE_TYPE=Bug
-```
-
-`JIRA_API_TOKEN` is an **API token, not your password** — Atlassian always rejects the password
-for API calls. Create one at
-[id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens),
-and make sure `JIRA_EMAIL` is the account it belongs to.
-
-Two Jira quirks are handled for you: the description is converted to **ADF** (Jira's REST v3 takes
-structured JSON, not a string — send a string and the whole issue is rejected with a 400 that
-names no field), and if your project has no Priority field on its create screen the issue is
-re-filed without it rather than failing.
-</details>
-
-<details>
-<summary><b>ClickUp</b></summary>
-
-```ini
-TRACKER_PROVIDER=clickup
-TRACKER_AUTO_PUSH=true
-
-CLICKUP_API_TOKEN=pk_12345_ABCDEF
-CLICKUP_LIST_ID=901234567
-CLICKUP_STATUS=to do          # optional; blank = the list default
-```
-
-`CLICKUP_LIST_ID` is the numeric **List** id — the trailing number in a list URL like
-`app.clickup.com/9012345/v/li/901234567`. Not a Space, Folder or task id; that mistake produces a
-404 that says nothing useful.
-
-Token from **ClickUp → Settings → Apps**. ClickUp wants the bare token in the header with **no
-`Bearer ` prefix**, and the description must go in `markdown_description` or it arrives with its
-`##` and `|` characters visible — both handled here.
-</details>
-
-<details>
-<summary><b>Linear</b></summary>
-
-```ini
-TRACKER_PROVIDER=linear
-TRACKER_AUTO_PUSH=true
-
-LINEAR_API_KEY=lin_api_...
-LINEAR_TEAM=ENG               # the team key, or its UUID
-```
-
-Key from **Linear → Settings → API**. `LINEAR_TEAM` takes the key you actually say out loud
-("ENG") and looks up the UUID the API wants.
-
-One limitation, stated on the ticket rather than hidden: Linear's public API has **no file
-upload**, so the screenshot and trace are *linked* rather than attached. Those links only work for
-people who can reach `PUBLIC_API_URL`.
-</details>
-
-**Idempotent.** A double-click, an impatient retry, or a timeout followed by a retry cannot create
-two issues for one bug — an idempotency key is claimed before the call and checked on entry.
-Duplicated bug reports are the fastest way for a team to stop trusting an automated reporter.
-
-**A failed push is visible and retryable.** It is recorded on the ticket with the reason, and the
-button becomes a retry. A confirmed bug that quietly never reached the developers is the worst
-outcome this feature has, so it is never swallowed.
-
-Not using any of the three? **Link an existing issue** still works — paste a key and URL, exactly
-as before.
-
----
-
 ## 📧 Email notifications
 
 Three notifications, three different audiences. Every one is **fire-and-forget**: a mail outage
@@ -423,9 +292,10 @@ can never fail a sign-in or lose a test result.
 
 | When | Who gets it | What it says |
 |---|---|---|
+| **Someone registers** | **the owners** | `Ali Khan (ali@x.com) created an account`, with the time, IP and device — the only signal that an account exists you did not create |
 | **Someone signs in** | that account | A security alert with the **time, IP address and device**, and what to do if it was not them |
-| **A run or website audit finishes** | whoever started it | Pass/fail counts, wording and design totals, and — importantly — **how many pages could not be tested at all** |
-| **A bug is confirmed** | the assignee | `BUG-007` is yours, with the tracker link. Falls back to the reporter when nobody is assigned |
+| **Testing starts** | whoever started it | `Testing has started on staging.yoursite.com` — how many pages were found, and roughly how long it will take. Sent after discovery, so it says something you could not already see |
+| **The run finishes** | whoever started it | **The result.** Counts, then every failure by name with the page, the reason and the console/API evidence — and how many pages could not be tested at all |
 
 ```ini
 MAIL_ENABLED=true
@@ -440,8 +310,9 @@ MAIL_FROM=AI QA <you@gmail.com>
 APP_PUBLIC_URL=https://qa.yourcompany.com
 
 MAIL_ON_LOGIN=true
+MAIL_ON_USER_JOINED=true      # to the OWNERS, not to the person who joined
+MAIL_ON_RUN_STARTED=true
 MAIL_ON_RUN_FINISHED=true
-MAIL_ON_BUG_FILED=true
 ```
 
 **Gmail:** your normal Google password is always rejected. Turn on 2FA, then generate a
@@ -452,9 +323,33 @@ derived from the port (465 = implicit TLS, 587 = STARTTLS), so you rarely need t
 Press **Test** on the Integrations panel to check the credentials — it opens an SMTP connection
 and hangs up, so it cannot put a test message in anyone's inbox.
 
-The run summary states the honest caveat rather than only the good news: if three of twelve pages
-could not be read, the email says so, because "24 passed" over a quarter-untested app is
-technically true and actively misleading.
+### The finish email carries the failures, not just the counts
+
+Because a run now goes from URL to results with no stop in between, this email is usually the
+**first** thing you see about it. "3 failed" would force a login just to learn whether it can
+wait, so each failure arrives spelled out:
+
+```
+What failed, and why
+──────────────────────────────────────────────
+✗ Login rejects a wrong password
+  /login
+  Expected the error message to be visible, but nothing appeared.
+      console: Uncaught TypeError: r.validate is not a function
+      POST /api/auth/login → 500
+
+✗ Employee list shows data from the server
+  /employees
+  Expected at least one row, but the table was empty.
+      GET /api/employees → 401
+```
+
+The reason comes from the **executor** — the assertion that did not hold — never from the AI's
+triage guess. A guess does not belong in a summary somebody forwards to a developer.
+
+It also states the honest caveat rather than only the good news: if three of twelve pages could
+not be read, the email says so, because "24 passed" over a quarter-untested app is technically
+true and actively misleading.
 
 ---
 
@@ -554,7 +449,8 @@ npm run check:browser -- https://your-site.com/login
 
 | Command | What it does |
 |---|---|
-| `.\kill-ports.ps1` | Frees ports 3000/4000 and kills stray watch processes |
+| `.\scripts\kill-ports.ps1` | Frees ports 3000/4000 and kills stray watch processes |
+| `.\scripts\release.ps1 -Version x.y.z` | Checks, bumps and pushes. CI publishes the release — see [Releasing](#-releasing) |
 | `npm run check:llm` | Verifies the LLM key, lists usable model ids |
 | `npm run check:browser -- <url>` | Verifies Chrome, previews a page scan |
 | `npm run set:owner -- --to a@b.com` | Changes an account's email / promotes it to owner |
@@ -584,7 +480,7 @@ The full annotated list lives in [`backend/.env.example`](backend/.env.example).
 | `CRAWL_DEFAULT_MAX_PAGES` | `10` | Default page budget for a whole-app run |
 | `CRAWL_DEFAULT_MAX_DEPTH` | `2` | Default link depth from the entry URL |
 | `CRAWL_MAX_PAGES_HARD` | `50` | The ceiling the API clamps to, whatever a request asks for |
-| `PUBLIC_API_URL` | `http://localhost:4000` | Absolute base for screenshot links in exported reports |
+| `PUBLIC_API_URL` | `http://localhost:4000` | Absolute base for screenshot links |
 | `FIGMA_TOKEN` | — | Optional. Enables design comparison. Scope: `file_content:read` only |
 | `FIGMA_TIMEOUT_MS` | `20000` | A design-system file can be large; raise it if reads time out |
 
@@ -652,10 +548,10 @@ Next.js dashboard  ──HTTP──►  NestJS API  ──►  MongoDB
 | 1 | Chrome follows the links from your URL to find the app's pages | `SCANNING` |
 | 2 | **Per page:** Chrome opens it, waits for it to render, lists every field/button/link | `SCANNING` |
 | 3 | **Per page:** AI turns checks + requirements + that list into structured JSON | `PLANNING` |
-| 4 | Policy engine validates every step against an allow-list | — |
-| 5 | **You approve or edit** — once, for the whole app | `AWAITING_APPROVAL` |
-| 6 | Chrome runs each test **starting at its own page**; assertions decide PASS/FAIL | `RUNNING` |
-| 7 | Failures re-run once, then become findings with an AI suggestion | `COMPLETED` |
+| 4 | Policy engine validates every step against an allow-list — **the gate** | — |
+| 5 | Chrome runs each test **starting at its own page**; assertions decide PASS/FAIL | `RUNNING` |
+| 6 | Failures re-run once, then become findings with an AI suggestion | `COMPLETED` |
+| 7 | The email goes out with every failure and its reason | `COMPLETED` |
 
 A single-page run is the same pipeline with one page in it — which is why nothing downstream
 carries an `if (wholeApp)` branch.
@@ -666,14 +562,23 @@ Deep detail: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · Endpoint refere
 
 ## 🔐 Safety
 
-Website content is untrusted input — a page can contain text trying to steer the AI. Four layers:
+Website content is untrusted input — a page can contain text trying to steer the AI. Three layers,
+and **none of them is a person clicking approve**:
 
 1. **The AI has no browser access.** Its output is data in the backend, not commands.
 2. **Schema validation** — wrong shape or unknown action is rejected.
-3. **The policy engine** — per step: action allow-list, same-origin navigation only, no destructive keywords (delete/pay/send) unless explicitly enabled, SSRF blocking, and a case with **zero assertions is rejected** because it could never fail.
-4. **The human gate** — nothing runs unapproved. Your edits go through layer 3 too.
+3. **The policy engine** — per step: action allow-list, same-origin navigation only, no destructive keywords (delete/pay/send) unless explicitly enabled on the run, SSRF blocking, and a case with **zero assertions is rejected** because it could never fail.
 
 Every rejection is shown in the UI. Nothing is silently dropped.
+
+> **Why there is no approval click.** It used to sit between layer 3 and execution, and it was the
+> weakest layer of the four: the button that got pressed was *Approve all*, on forty cases nobody
+> read. What it reliably added was delay — a run sat idle until somebody noticed it. The checks
+> that actually stop a bad step run on every case whether or not anyone is watching.
+>
+> **Destructive actions are still opt-in.** A step touching `delete`, `pay` or `send` is rejected
+> unless you tick *Allow destructive actions* when starting the run. That is the real gate, and it
+> is a decision you make **before** the run, not a click during it.
 
 ### Credentials never reach the AI
 
@@ -685,14 +590,12 @@ Test passwords are encrypted with **AES-256-GCM**. The AI only ever writes `test
 
 | Layer | Technology | Why |
 |---|---|---|
-| Frontend | Next.js 15, TypeScript | Dashboard and report viewer |
+| Frontend | Next.js 15, TypeScript | Dashboard and results viewer |
 | Backend | NestJS 11, TypeScript | Same language as Playwright — no Python↔Node bridge |
 | Browser | Playwright driving **real Chrome** | Closest to what users run; falls back to Chromium |
 | Database | MongoDB + Prisma | Native `Json` and arrays, so the AI's steps and assertions are stored as documents rather than encoded text |
 | AI | Groq / any OpenAI-compatible API | Free tier; one env var switches provider |
 | Auth | JWT + scrypt | No native dependency; every action attributed to a person |
-| PDF | Chrome print-to-PDF | No extra library — Chrome is already here |
-| Trackers | Jira REST v3 · ClickUp v2 · Linear GraphQL | One `TrackerProvider` interface; adding a fourth is one file |
 | Email | Nodemailer over SMTP | Works with Gmail, Office 365 or your own relay — no vendor lock-in |
 
 Playwright needs **no API key** — it's a library, not a service. The LLM key is the only secret in the project.
@@ -712,19 +615,26 @@ Playwright needs **no API key** — it's a library, not a service. The LLM key i
 │       ├── policy/                THE SAFETY GATE
 │       ├── runs/                  run-pipeline.service.ts = the whole flow
 │       ├── findings/              triage: confirm / reject / reopen
-│       ├── reports/               bug report → Markdown / HTML / PDF
-│       ├── tickets/               assignment, lifecycle, external filing
-│       ├── trackers/              Jira / ClickUp / Linear providers
 │       ├── mail/                  notifications + HTML email templates
 │       └── common/                the action/assertion contract, check catalogue
 │
 ├── frontend/                      Next.js dashboard
-│   ├── app/                       dashboard, runs/new, runs/[id], findings, tickets
+│   ├── app/                       dashboard, runs/new, runs/[id], findings
 │   ├── components/                RunForm, CheckPicker, TestCaseCard, FindingCard…
 │   └── lib/api.ts                 the only file that calls the backend
 │
-└── docs/                          ARCHITECTURE.md, API.md, screenshots/
+├── docs/                          ARCHITECTURE.md, API.md, screenshots/
+├── scripts/                       repo-level ops: kill-ports, release, mongo setup
+├── .github/workflows/ci.yml       build + secret scan, then release on a version bump
+├── artifacts/                     run evidence at runtime — gitignored, not source
+└── docker-compose.yml             the single-node MongoDB replica set
 ```
+
+Two `scripts/` folders, deliberately: [`scripts/`](scripts/) holds PowerShell you run *on the
+repo* (free the ports, cut a release, configure mongod), while
+[`backend/scripts/`](backend/scripts/) holds TypeScript you run *through the app's own runtime*
+(`npm run check:llm`, `check:browser`, `set:owner`) — those need the Nest config and Prisma client
+loaded, so they live with the code they import.
 
 The **contract** lives in one file — [`backend/src/common/test-plan.types.ts`](backend/src/common/test-plan.types.ts). The AI's schema, the policy engine and the executor all import from it, so they can never drift apart.
 
@@ -737,18 +647,11 @@ POST /api/auth/register              first account becomes OWNER
 POST /api/runs                       url + checks + requirements → starts everything
 GET  /api/runs/:id                   everything the run page needs, one call
 GET  /api/runs/:id/pages/:pageId     one page's snapshot + its advisory lists
-POST /api/runs/:id/execute           run the approved tests
-POST /api/test-cases/:id/approve     the human gate
+POST /api/runs/:id/execute           re-run the tests
 POST /api/findings/:id/triage        the human verdict → mints BUG-001
 POST /api/content-issues/:id/promote a typo → a real bug, after you say so
 POST /api/design-issues/:id/promote  a design mismatch → a real bug, after you say so
-GET  /api/findings/:id/report/pdf    BUG-001.pdf
-POST /api/findings/:id/tickets       create TICKET-001 from a confirmed bug
-POST /api/tickets/:id/retest         the Ready-for-Retest handoff
-POST /api/tickets/:id/push           file it in Jira / ClickUp / Linear (idempotent)
-GET  /api/trackers/status            which tracker is connected, if any
-POST /api/trackers/verify            check the credentials — files nothing
-GET  /api/integrations               tracker + email status (never any secret)
+GET  /api/integrations               email status (never any secret)
 POST /api/integrations/mail/verify   check SMTP — sends nothing
 ```
 
@@ -767,21 +670,75 @@ Being upfront is more useful than a long feature list:
 | Pixel / visual regression | Design comparison checks sizes, type, colours, icons and spacing — not positions, arbitrary widths, or a screenshot diff |
 | **Design comparison across pages** | One Figma frame per run, against one page. A frame is one screen's design; see above. |
 | Firefox, Safari, mobile | Chrome only |
-| Two-way tracker sync | It **creates** the issue; it does not yet read status changes back from Jira/ClickUp |
 | File upload, iframes, popups | — |
-| Email reports, scheduled runs, CI | — |
+| Scheduled runs, CI integration | — |
 | Automatic test healing | **Deliberately excluded** — a test that edits itself until it passes silently deletes the assertion that was catching the bug |
 
 ### Roadmap, in order
 
-1. **Two-way tracker sync** — read status back, so closing in Jira closes here
 2. **Sitemap and route-manifest discovery** — read `sitemap.xml` and Next.js routes instead of only following links
-3. **Visual regression** — approve a screenshot baseline, flag pixel changes
+3. **Visual regression** — save a screenshot baseline, flag pixel changes
 4. **Parallel page planning** — one worker per page, once a paid LLM tier makes it safe
 5. **Slack notifications** — the same three events, in a channel
 6. **Scheduled runs + CI** — nightly, and on every deploy
 
-Shipped since the first cut: **whole-app runs**, **MongoDB**, **Jira / ClickUp / Linear auto-filing**, **email notifications**, **colour / icon / spacing / weight design checks**, **session reuse**, **wording review**, **design-vs-Figma comparison**, **stuck-loader** and **server-data** checks, and the **what-kind** bug category.
+Shipped since the first cut: **whole-app runs**, **MongoDB**, **runs that start on their own**, **failure detail in the finish email**, **colour / icon / spacing / weight design checks**, **session reuse**, **wording review**, **design-vs-Figma comparison**, **stuck-loader** and **server-data** checks, and the **what-kind** bug category.
+
+---
+
+## 🚢 Releasing
+
+**Push the version, and the release cuts itself.** There is no separate publish step.
+
+Every push to `main` runs CI — backend build, frontend build, secret scan — and then one more job
+reads the version out of `package.json`:
+
+```
+push to main
+     │
+     ├─ backend build ─┐
+     ├─ frontend build ─┼─ all green? ──► version already tagged? ──► yes ─► stop
+     └─ secret scan ───┘                            │
+                                                    └─ no ──► tag v0.4.0
+                                                              publish the release
+                                                              notes = the CHANGELOG section
+```
+
+So a release is **a version bump plus a changelog entry** — a two-line diff anyone can raise as a
+PR and anyone can review. Merge it and the tag appears. Push a normal commit without touching the
+version and nothing is released, which is the point: a tag per commit makes the tag list useless
+and "which version is on staging" unanswerable.
+
+### Cutting one
+
+```powershell
+.\scripts\release.ps1 -Version 0.4.1 -DryRun     # every check, pushes nothing
+.\scripts\release.ps1 -Version 0.4.1 -Message "fix: …"
+```
+
+The script runs the same checks **before** anything leaves your machine — secret scan, both
+typechecks, both builds, and a check that `CHANGELOG.md` actually has a `## [0.4.1]` section —
+then bumps both `package.json` files, commits and pushes. CI does the rest.
+
+Or skip the script entirely: edit the two versions and the changelog by hand, push, done.
+
+### Why the script does not tag
+
+It used to. Now exactly one thing creates tags, and it is the one that has just proven the build
+is green on a clean machine. Two taggers is how you end up with a tag on one commit and a release
+on another, and the local script cannot know whether CI will pass.
+
+| Guard | What it stops |
+|---|---|
+| `needs: [backend, frontend, secrets]` | Releasing a broken build, or one with a leaked credential |
+| Versions must match in both `package.json` files | A half-done bump, where the tag picks one of two answers |
+| `CHANGELOG.md` must have a `## [x.y.z]` section | A release nobody documented. The notes **are** that section — never a list of commit subjects |
+| Tag already exists → skip, don't fail | Ordinary pushes after a release are not errors |
+| Tag points at `$GITHUB_SHA` | The tag marks the commit that was built, not wherever `main` drifted to since |
+
+> **One-time setup:** Settings → Actions → General → *Workflow permissions* → **Read and write
+> permissions**. Without it the release job cannot push a tag. Nothing else is needed — no secret,
+> no token: `GITHUB_TOKEN` is issued to the run.
 
 ---
 
@@ -789,7 +746,7 @@ Shipped since the first cut: **whole-app runs**, **MongoDB**, **Jira / ClickUp /
 
 | Symptom | Fix |
 |---|---|
-| `EADDRINUSE` / port stuck | `.\kill-ports.ps1` |
+| `EADDRINUSE` / port stuck | `.\scripts\kill-ports.ps1` |
 | Header says **backend offline** | `cd backend && npm run start:dev` |
 | Boot fails listing env problems | Fix exactly those lines in `backend/.env` |
 | `401` from the LLM | Wrong `LLM_API_KEY` → `npm run check:llm` |
@@ -797,16 +754,12 @@ Shipped since the first cut: **whole-app runs**, **MongoDB**, **Jira / ClickUp /
 | `413 Request too large` | Groq free tier is 8000 tokens/min **and counts `LLM_MAX_TOKENS`**. Keep it ≤4000. |
 | Scan found 0 elements, screenshot shows **"Loading…"** | Client-rendered app painting late → raise `SCAN_SETTLE_TIMEOUT_MS` |
 | Lots of `LOCATOR_NOT_FOUND` | Open **Details → What the AI could see**. If the label is listed, raise `BROWSER_ACTION_TIMEOUT_MS`; if not, edit the test's target |
-| `EPERM … query_engine-windows.dll` | The dev server holds the file — `.\kill-ports.ps1`, then `npx prisma generate` |
+| `EPERM … query_engine-windows.dll` | The dev server holds the file — `.\scripts\kill-ports.ps1`, then `npx prisma generate` |
 | `Server selection timeout` on boot | MongoDB is not running → `docker compose up -d` |
 | Writes fail with `not primary` | Your mongod is standalone, not a replica set. Use `docker compose up -d`, or Atlas |
 | A whole-app run found only 1 page | It is behind a login and no sign-in URL was given — signed out, the app is a login form with no links |
 | A whole-app run is slow | One AI call per page, run sequentially. Lower **Maximum pages** |
 | Run says "2 of 6" and COMPLETED | Was a bug (an index rejected the 2nd finding, killing the loop). Fixed — run `npx prisma db push` if you are on an older database |
-| Push button missing on a ticket | No tracker configured. Set `TRACKER_PROVIDER` and restart |
-| Jira `400` on push | Issue type or a required custom field. Check `JIRA_ISSUE_TYPE` exists in that project |
-| Jira `401` | You used your password. It must be an API token, with `JIRA_EMAIL` as its owner |
-| ClickUp `404` | `CLICKUP_LIST_ID` is not a **List** id. Take the trailing number from a list URL |
 | No emails arriving | Press **Test** on Account → Integrations. For Gmail you need an App Password, not your password |
 | Email links go to localhost | Set `APP_PUBLIC_URL` to the address your team opens |
 
@@ -819,7 +772,7 @@ Two things the old SQLite build had to fake are native here, and both are now si
 | Was | Now |
 |---|---|
 | `packJson()` / `unpackJson()` — JSON stored as text | `Json` columns. Steps, assertions, step timelines, the page snapshot and the AI's evidence are real documents |
-| `packTags()` / `unpackTags()` — comma-separated strings | `String[]`. Tags, checks and ticket labels are real arrays |
+| `packTags()` / `unpackTags()` — comma-separated strings | `String[]`. Tags and checks are real arrays |
 | `src/common/hydrate.ts` — reassembling every response | Deleted. What the driver returns *is* the response shape |
 
 Three deliberate choices worth knowing:
@@ -848,6 +801,8 @@ is written as sequential awaits instead. Each step is independently safe.
 | [docs/API.md](docs/API.md) | Every endpoint with request/response examples |
 | [backend/.env.example](backend/.env.example) | Every setting, annotated |
 | [backend/prisma/schema.prisma](backend/prisma/schema.prisma) | The MongoDB data model |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Build, secret scan, and the release-on-push job |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each version — and the source of every release note |
 
 ---
 
@@ -856,8 +811,8 @@ is written as sequential awaits instead. Each step is independently safe.
 **The honest promise**
 
 > Give it an authorised app and say what should work.
-> It finds your pages, proposes reviewable tests for each, runs them in Chrome,
-> collects real evidence, and helps your team turn failures into actionable bug reports.
+> It finds your pages, writes a test plan for each, runs them in Chrome,
+> collects real evidence, and emails you what broke and why.
 
 Not *"enter any URL and AI finds every bug."* That claim doesn't survive contact with a real app.
 

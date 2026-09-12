@@ -11,8 +11,6 @@ import {
 } from '../lib/api';
 import type { Finding } from '../lib/types';
 import { useAuth } from './AuthProvider';
-import { BugReportActions } from './BugReportActions';
-import { CreateTicketDialog } from './CreateTicketDialog';
 import { ResultEvidence } from './ResultEvidence';
 import { ScreenshotPanel } from './ScreenshotPanel';
 import {
@@ -20,7 +18,6 @@ import {
   ClassificationBadge,
   FindingStatusBadge,
   PriorityBadge,
-  TicketStatusBadge,
 } from './StatusBadge';
 
 /**
@@ -66,7 +63,6 @@ export function FindingCard({
   const [error, setError] = useState<string | null>(null);
   const [showEvidence, setShowEvidence] = useState(false);
   const [showTriage, setShowTriage] = useState(false);
-  const [showTicket, setShowTicket] = useState(false);
 
   // Bug-report fields captured at triage time, so the report is complete
   // the moment the defect is confirmed rather than filled in later.
@@ -126,27 +122,10 @@ export function FindingCard({
             <PriorityBadge priority={finding.priority ?? finding.testCase.priority} />
             <strong>{finding.testCase.title}</strong>
           </div>
-          {(finding.module || finding.build || finding.ticket) && (
+          {(finding.module || finding.build) && (
             <div className="row" style={{ marginTop: 5 }}>
               {finding.module && <span className="pill">module: {finding.module}</span>}
               {finding.build && <span className="pill">build: {finding.build}</span>}
-              {finding.ticket && (
-                <>
-                  <span className="pill pill-key">{finding.ticket.key}</span>
-                  <TicketStatusBadge status={finding.ticket.status} />
-                  {finding.ticket.externalUrl && (
-                    <a
-                      className="pill"
-                      href={finding.ticket.externalUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open in the external tracker"
-                    >
-                      {finding.ticket.externalKey} &#8599;
-                    </a>
-                  )}
-                </>
-              )}
             </div>
           )}
           <div className="row faint" style={{ marginTop: 4 }}>
@@ -224,16 +203,6 @@ export function FindingCard({
           <button className="btn btn-sm btn-primary" onClick={() => setShowTriage(true)}>
             Triage this
           </button>
-        )}
-        {['CONFIRMED', 'REOPENED'].includes(finding.status) && !finding.ticket && canWrite && (
-          <button className="btn btn-sm" onClick={() => setShowTicket((v) => !v)}>
-            + Create ticket
-          </button>
-        )}
-        {finding.ticket && (
-          <a className="btn btn-sm" href={`/tickets/${finding.ticket.id}`}>
-            Open {finding.ticket.key}
-          </a>
         )}
         {finding.status === 'CONFIRMED' && canWrite && (
           <button
@@ -376,23 +345,7 @@ export function FindingCard({
         </div>
       )}
 
-      {showTicket && (
-        <CreateTicketDialog
-          finding={finding}
-          onCreated={() => {
-            setShowTicket(false);
-            onChanged();
-          }}
-          onCancel={() => setShowTicket(false)}
-        />
-      )}
-
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-        <div className="faint" style={{ marginBottom: 6 }}>
-          BUG REPORT
-        </div>
-        <BugReportActions finding={finding} />
-
         {/* The screenshot is shown here rather than hidden behind Evidence: it is
             the first thing anyone wants to see about a failure. */}
         {finding.result?.screenshotPath && (

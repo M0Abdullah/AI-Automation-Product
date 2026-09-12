@@ -1,6 +1,6 @@
 {
   "name": "aitest-frontend",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "AI testing platform - web dashboard (Next.js App Router)",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
-    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../kill-ports.ps1"
+    "kill": "powershell -NoProfile -ExecutionPolicy Bypass -File ../scripts/kill-ports.ps1"
   },
   "dependencies": {
     "next": "^15.1.0",

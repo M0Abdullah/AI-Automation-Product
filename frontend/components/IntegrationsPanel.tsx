@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getIntegrations, verifyMail, verifyTracker } from '../lib/api';
+import { getIntegrations, verifyMail } from '../lib/api';
 import type { IntegrationStatus } from '../lib/types';
 
 /**
@@ -9,29 +9,19 @@ import type { IntegrationStatus } from '../lib/types';
  *
  * Two questions, and they are not the same one: *is it configured* is answered
  * by reading env vars, and *does it work* needs a real call. A panel that only
- * answered the first would show a confident green tick next to an expired API
- * token — so each row carries its own **Test** button.
+ * answered the first would show a confident green tick next to an expired
+ * password — so the row carries its own **Test** button.
  *
- * Neither test creates anything. The tracker check reads the account and the
- * project; the mail check opens an SMTP connection and hangs up. A "test"
- * button that filed a junk issue into a real backlog, or put a test email in
- * somebody's inbox, would be worse than no button at all.
+ * The test creates nothing: it opens an SMTP connection and hangs up. A "test"
+ * button that put a message in somebody's inbox would be worse than no button.
  */
 
 type Check = { ok: boolean; detail: string } | null;
-
-const PROVIDER_LABEL: Record<string, string> = {
-  none: 'None',
-  jira: 'Jira',
-  clickup: 'ClickUp',
-  linear: 'Linear',
-};
 
 export function IntegrationsPanel() {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [trackerCheck, setTrackerCheck] = useState<Check>(null);
   const [mailCheck, setMailCheck] = useState<Check>(null);
 
   useEffect(() => {
@@ -40,19 +30,12 @@ export function IntegrationsPanel() {
       .catch((e) => setError((e as Error).message));
   }, []);
 
-  const runCheck = async (which: 'tracker' | 'mail') => {
+  const runCheck = async (which: 'mail') => {
     setBusy(which);
     try {
-      if (which === 'tracker') {
-        const r = await verifyTracker();
-        setTrackerCheck({ ok: r.ok, detail: r.detail });
-      } else {
-        setMailCheck(await verifyMail());
-      }
+      setMailCheck(await verifyMail());
     } catch (e) {
-      const detail = (e as Error).message;
-      if (which === 'tracker') setTrackerCheck({ ok: false, detail });
-      else setMailCheck({ ok: false, detail });
+      setMailCheck({ ok: false, detail: (e as Error).message });
     } finally {
       setBusy(null);
     }
@@ -82,7 +65,6 @@ export function IntegrationsPanel() {
     );
   }
 
-  const t = status.tracker;
   const m = status.mail;
 
   return (
@@ -91,74 +73,13 @@ export function IntegrationsPanel() {
         <div>
           <h2>Integrations</h2>
           <span className="faint">
-            Where confirmed bugs go, and who gets told. Both are configured in{' '}
-            <code>backend/.env</code> and take effect on restart.
+            Who gets told, and when. Configured in <code>backend/.env</code>; takes effect on
+            restart.
           </span>
         </div>
       </div>
 
       <div className="stack-sm">
-        {/* ------------------------------------------------ issue tracker */}
-        <div className="integration-row">
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="row" style={{ marginBottom: 4, flexWrap: 'wrap' }}>
-              <strong>Issue tracker</strong>
-              <span className={`badge ${t.enabled ? 'badge-pass' : 'badge-neutral'}`}>
-                {t.enabled ? PROVIDER_LABEL[t.provider] ?? t.provider : 'Not connected'}
-              </span>
-              {t.autoPush && (
-                <span className="badge badge-info" title="Filed the moment a bug is confirmed">
-                  automatic
-                </span>
-              )}
-            </div>
-
-            <div className="faint">{t.describe}</div>
-
-            {t.enabled ? (
-              <div className="faint" style={{ marginTop: 4 }}>
-                {t.autoPush
-                  ? 'A confirmed defect is filed automatically, with the bug report, the screenshot and the trace attached.'
-                  : 'Tickets stay here until you press “Push” on one. Set TRACKER_AUTO_PUSH=true to file them the moment they are confirmed.'}
-              </div>
-            ) : (
-              <div className="faint" style={{ marginTop: 4 }}>
-                Bugs stay in this tool.{' '}
-                {t.missingConfig.length > 0 && (
-                  <>
-                    Set{' '}
-                    {t.missingConfig.map((v, i) => (
-                      <span key={v}>
-                        {i > 0 && ', '}
-                        <code>{v}</code>
-                      </span>
-                    ))}{' '}
-                    to file into Jira, ClickUp or Linear.
-                  </>
-                )}
-              </div>
-            )}
-
-            {trackerCheck && (
-              <div
-                className={`banner ${trackerCheck.ok ? 'banner-success' : 'banner-error'}`}
-                style={{ marginTop: 8, display: 'block' }}
-              >
-                {trackerCheck.detail}
-              </div>
-            )}
-          </div>
-
-          <button
-            className="btn btn-sm"
-            disabled={busy !== null}
-            onClick={() => void runCheck('tracker')}
-            title="Checks the credentials. Does not create an issue."
-          >
-            {busy === 'tracker' ? <span className="spinner" /> : null} Test
-          </button>
-        </div>
-
         {/* -------------------------------------------------------- email */}
         <div className="integration-row">
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -182,12 +103,16 @@ export function IntegrationsPanel() {
                   device
                 </li>
                 <li>
-                  {m.events.onRunFinished ? '✓' : '✗'} A pass/fail summary when a run or website
-                  audit finishes
+                  {m.events.onUserJoined ? '✓' : '✗'} The owners are told when somebody creates an
+                  account
                 </li>
                 <li>
-                  {m.events.onBugFiled ? '✓' : '✗'} The assignee is told when a confirmed bug becomes
-                  theirs
+                  {m.events.onRunStarted ? '✓' : '✗'} “Testing has started”, once the pages are
+                  known
+                </li>
+                <li>
+                  {m.events.onRunFinished ? '✓' : '✗'} The result when a run finishes — every
+                  failure, with the reason for each
                 </li>
               </ul>
             )}

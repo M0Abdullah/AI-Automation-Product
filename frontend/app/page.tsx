@@ -6,7 +6,6 @@ import {
   ClassificationBadge,
   PriorityBadge,
   RunStatusBadge,
-  TicketStatusBadge,
 } from '../components/StatusBadge';
 import { getDashboard } from '../lib/api';
 import { SEVERITY_LABEL, type DashboardOverview } from '../lib/types';
@@ -16,7 +15,7 @@ import { SEVERITY_LABEL, type DashboardOverview } from '../lib/types';
  *
  * Ordered by what a QA lead needs, top to bottom:
  *   1. Is the suite healthy?      -> pass rate + result breakdown
- *   2. What needs me today?       -> triage queue and tickets to retest
+ *   2. What needs me today?       -> the triage queue
  *   3. Is the tooling trustworthy? -> product bugs vs test defects
  *   4. What happened recently?    -> run history
  */
@@ -50,7 +49,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { tests, findings, tickets, runs } = data;
+  const { tests, findings, runs } = data;
   const isEmpty = runs.total === 0;
 
   return (
@@ -131,18 +130,6 @@ export default function DashboardPage() {
                   tone="warn"
                 />
                 <AttentionRow
-                  href="/tickets"
-                  count={tickets.readyForRetest}
-                  label="tickets ready to retest"
-                  tone="brand"
-                />
-                <AttentionRow
-                  href="/tickets"
-                  count={tickets.open}
-                  label="open tickets"
-                  tone="info"
-                />
-                <AttentionRow
                   href="/findings"
                   count={findings.confirmed}
                   label="confirmed bugs"
@@ -192,38 +179,6 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {data.needsRetest.length > 0 && (
-                <div className="card">
-                  <div className="card-head">
-                    <h2>Bug tickets in progress</h2>
-                    <Link href="/tickets" className="btn btn-sm btn-ghost">
-                      Open board
-                    </Link>
-                  </div>
-                  <div className="stack-sm">
-                    {data.needsRetest.map((t) => (
-                      <Link
-                        key={t.id}
-                        href={`/tickets/${t.id}`}
-                        className="card card-tight card-link"
-                        style={{ boxShadow: 'none' }}
-                      >
-                        <div className="row">
-                          <span className="pill pill-key">{t.key}</span>
-                          <TicketStatusBadge status={t.status} />
-                          <PriorityBadge priority={t.priority} />
-                        </div>
-                        <div className="truncate" style={{ marginTop: 5, fontWeight: 550 }}>
-                          {t.title}
-                        </div>
-                        <div className="faint" style={{ marginTop: 3 }}>
-                          {t.assignee?.name ?? 'Unassigned'}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="stack">
@@ -278,8 +233,6 @@ export default function DashboardPage() {
                 <dl className="detail-grid">
                   <dt>Total cases</dt>
                   <dd>{tests.total}</dd>
-                  <dt>Approved</dt>
-                  <dd>{tests.approved}</dd>
                   <dt>Human edited</dt>
                   <dd>
                     {tests.humanEdited}

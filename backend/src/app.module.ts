@@ -15,21 +15,17 @@ import { MailModule } from './mail/mail.module';
 import { PolicyModule } from './policy/policy.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './projects/projects.module';
-import { ReportsModule } from './reports/reports.module';
 import { ResultsModule } from './results/results.module';
 import { RunsModule } from './runs/runs.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { TestCasesModule } from './test-cases/test-cases.module';
-import { TicketsModule } from './tickets/tickets.module';
-import { TrackersModule } from './trackers/trackers.module';
 
 /**
  * Module map, grouped by layer:
  *
- *  infrastructure : AppConfig, Prisma, Secrets, Auth, Mail, Trackers (global)
+ *  infrastructure : AppConfig, Prisma, Secrets, Auth, Mail (global)
  *  capability     : Llm (brain), Browser (hands), Policy (gate)
- *  product        : Projects, Runs, TestCases, Results, Findings,
- *                   Tickets, Reports, Artifacts
+ *  product        : Projects, Runs, TestCases, Results, Findings, Artifacts
  *
  * JwtAuthGuard is registered as a GLOBAL guard, so the API is default-deny:
  * a new endpoint is protected unless it is explicitly marked @Public().
@@ -41,10 +37,9 @@ import { TrackersModule } from './trackers/trackers.module';
     PrismaModule,
     SecretsModule,
     AuthModule,
-    // Both global: notifications and issue filing are cross-cutting, and
-    // threading them through every product module adds only ceremony.
+    // Global: notifications are cross-cutting, and threading them through
+    // every product module adds only ceremony.
     MailModule,
-    TrackersModule,
     // capability
     LlmModule,
     BrowserModule,
@@ -57,8 +52,6 @@ import { TrackersModule } from './trackers/trackers.module';
     TestCasesModule,
     ResultsModule,
     FindingsModule,
-    ReportsModule,
-    TicketsModule,
     ArtifactsModule,
   ],
   controllers: [SystemController],

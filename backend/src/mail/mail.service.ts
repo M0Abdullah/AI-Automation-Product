@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { AppConfigService } from '../config/app-config.service';
-import { layout, type Row } from './templates';
+import { layout, type Failure, type Row } from './templates';
 
 /**
  * OUTBOUND EMAIL.
@@ -151,6 +151,59 @@ export class MailService implements OnModuleInit {
     );
   }
 
+  /**
+   * SOMEBODY CREATED AN ACCOUNT — sent to the owner, not to them.
+   *
+   * The sign-in alert above goes to the person signing in, which means the
+   * people running the instance never learn that anyone joined. On an instance
+   * with open registration that is the one event they actually need: it is the
+   * only signal that an account exists that they did not create.
+   *
+   * Sent on registration only. A login is not a join, and mailing the owner on
+   * every login would train them to filter the alert that matters.
+   */
+  async sendUserJoined(input: {
+    to: string;
+    ownerName: string;
+    newUserName: string;
+    newUserEmail: string;
+    role: string;
+    at: Date;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    isFirstAccount: boolean;
+  }): Promise<boolean> {
+    const rows: Row[] = [
+      { label: 'Name', value: input.newUserName },
+      { label: 'Email', value: input.newUserEmail },
+      { label: 'Role', value: input.role },
+      { label: 'When', value: input.at.toUTCString() },
+      { label: 'IP address', value: input.ipAddress || 'not recorded' },
+      { label: 'Device', value: summariseUserAgent(input.userAgent) },
+    ];
+
+    const body = layout({
+      preheader: `${input.newUserName} (${input.newUserEmail}) created an account.`,
+      heading: input.isFirstAccount
+        ? `${input.newUserName} created the first account`
+        : `${input.newUserName} joined`,
+      intro: input.isFirstAccount
+        ? `${input.newUserName} registered the first account on this instance and is now the owner.`
+        : `Hello ${input.ownerName}, a new account was just created on your AI QA instance.`,
+      rows,
+      cta: { label: 'Manage accounts', url: this.appUrl('/account') },
+      callouts: input.isFirstAccount
+        ? []
+        : [
+            'If you did not expect this, close registration by setting ' +
+              'ALLOW_OPEN_REGISTRATION=false in backend/.env and deactivate the account.',
+          ],
+      footnote: 'You receive this because you are an owner of this instance.',
+    });
+
+    return this.send(input.to, `New account: ${input.newUserName}`, body.html, body.text);
+  }
+
   // =========================================================== run events
 
   /**
@@ -204,70 +257,6 @@ export class MailService implements OnModuleInit {
   }
 
   /**
-   * TESTS ARE READY FOR YOUR APPROVAL.
-   *
-   * THE MOST IMPORTANT NOTIFICATION IN THE PRODUCT, and the one that was
-   * missing. The pipeline deliberately stops here: nothing touches a browser
-   * until a human approves the plan. That gate is the platform's whole safety
-   * argument — and it also means a run that nobody is told about sits in
-   * AWAITING_APPROVAL forever. The user closes the tab believing the tool is
-   * working, and it is waiting on them.
-   *
-   * So this email exists to say one thing clearly: it is your turn.
-   */
-  async sendTestsReady(input: {
-    to: string;
-    name: string;
-    runId: string;
-    runName: string;
-    targetUrl: string;
-    caseCount: number;
-    pagesPlanned: number;
-    pagesFailed: number;
-    totalPages: number;
-  }): Promise<boolean> {
-    const rows: Row[] = [
-      { label: 'Target', value: input.targetUrl },
-      { label: 'Tests proposed', value: String(input.caseCount) },
-      ...(input.totalPages > 1
-        ? [{ label: 'Pages covered', value: `${input.pagesPlanned} of ${input.totalPages}` }]
-        : []),
-    ];
-
-    const callouts = [
-      'Nothing has run yet, and nothing will until you approve it. That is deliberate — the ' +
-        'tests open a real browser against your site.',
-    ];
-    if (input.pagesFailed > 0) {
-      callouts.push(
-        `${input.pagesFailed} page${input.pagesFailed === 1 ? '' : 's'} could not be read, so ` +
-          `no tests exist for ${input.pagesFailed === 1 ? 'it' : 'them'}. The run page gives the reason for each.`,
-      );
-    }
-
-    const body = layout({
-      preheader: `${input.caseCount} test(s) are waiting for your approval on ${hostOf(input.targetUrl)}.`,
-      heading: `${input.caseCount} test${input.caseCount === 1 ? '' : 's'} ready for your review`,
-      intro:
-        `Hello ${input.name}, the AI has finished writing test cases for “${input.runName}”. ` +
-        'Read them, edit anything that looks wrong, then approve — that is when they actually run.',
-      rows,
-      callouts,
-      cta: { label: 'Review and approve', url: this.appUrl(`/runs/${input.runId}`) },
-      footnote:
-        'Each test lists its steps and the exact assertions that decide pass or fail, so you can ' +
-        'see what it will do before it does it.',
-    });
-
-    return this.send(
-      input.to,
-      `Action needed: ${input.caseCount} test${input.caseCount === 1 ? '' : 's'} to approve — ${input.runName}`,
-      body.html,
-      body.text,
-    );
-  }
-
-  /**
    * RUN FINISHED — the summary of what was tested and what broke.
    *
    * This is the "tell me when my audit is done" email. It leads with the counts
@@ -295,6 +284,8 @@ export class MailService implements OnModuleInit {
     };
     contentIssues: number;
     designIssues: number;
+    /** Every failed test, with the executor's reason and its evidence. */
+    failures?: Failure[];
   }): Promise<boolean> {
     const s = input.summary;
     const broken = s.failed + s.errored;
@@ -332,12 +323,7 @@ export class MailService implements OnModuleInit {
           'nothing in this summary says whether they work. The run page lists the reason for each.',
       );
     }
-    if (s.openFindings > 0) {
-      caveats.push(
-        `${s.openFindings} failure${s.openFindings === 1 ? '' : 's'} need a human decision. ` +
-          'They are findings, not bugs — nothing has been filed against your developers yet.',
-      );
-    }
+
 
     const body = layout({
       preheader: headline,
@@ -345,87 +331,23 @@ export class MailService implements OnModuleInit {
       intro:
         `Hello ${input.name}, your run “${input.runName}” has finished. ` +
         (broken > 0
-          ? 'Each failure has a screenshot of the moment it broke, the console errors and the failed API calls.'
+          ? 'What broke is listed below, with the reason for each. The run page adds a screenshot ' +
+            'of the moment it failed, the console errors and the failed API calls.'
           : 'No test failed.'),
       rows,
+      failures: input.failures,
+      failuresTitle: `What failed, and why`,
       cta: { label: 'Open the full results', url: this.appUrl(`/runs/${input.runId}`) },
       callouts: caveats,
       footnote:
-        'A failed test is not automatically a bug. Every failure is re-run once in a clean browser, ' +
-        'and a person decides whether it is a real defect before anything is filed.',
+        'Every failure was re-run once in a clean browser before being reported, so a one-off ' +
+        'timing blip is marked flaky rather than failed. Screenshots, console output and the ' +
+        'failed API calls for each are on the run page.',
     });
 
     return this.send(input.to, `${headline} — ${input.runName}`, body.html, body.text);
   }
 
-  // ======================================================== defect events
-
-  /**
-   * A CONFIRMED DEFECT, and where it went.
-   *
-   * Sent when a human confirms a finding and a ticket is created — to the
-   * assignee, because they are the person who has to act, and it carries the
-   * tracker link so they never need to open this tool.
-   */
-  async sendBugFiled(input: {
-    to: string;
-    name: string;
-    bugKey: string;
-    ticketKey: string;
-    title: string;
-    severity?: string | null;
-    priority?: string | null;
-    targetUrl?: string | null;
-    pageUrl?: string | null;
-    findingId: string;
-    external?: { provider: string; key: string; url: string } | null;
-    pushError?: string | null;
-  }): Promise<boolean> {
-    const rows: Row[] = [
-      { label: 'Bug', value: input.bugKey },
-      { label: 'Ticket', value: input.ticketKey },
-      ...(input.severity ? [{ label: 'Severity', value: prettyEnum(input.severity) }] : []),
-      ...(input.priority ? [{ label: 'Priority', value: input.priority }] : []),
-      ...(input.pageUrl || input.targetUrl
-        ? [{ label: 'Page', value: (input.pageUrl ?? input.targetUrl) as string }]
-        : []),
-      ...(input.external
-        ? [{ label: prettyProvider(input.external.provider), value: input.external.key }]
-        : []),
-    ];
-
-    const body = layout({
-      preheader: `${input.bugKey} assigned to you: ${input.title}`,
-      heading: `${input.bugKey} is assigned to you`,
-      intro:
-        `Hello ${input.name}, a QA reviewer confirmed this as a real defect and it is now ` +
-        `${input.ticketKey}. The full bug report — steps, expected vs actual, screenshot, ` +
-        'console and API errors — is on the ticket.',
-      rows,
-      cta: input.external
-        ? { label: `Open ${input.external.key}`, url: input.external.url }
-        : { label: `Open ${input.ticketKey}`, url: this.appUrl('/tickets') },
-      callouts: input.pushError
-        ? [
-            `This was NOT filed in your issue tracker: ${input.pushError} ` +
-              'The ticket exists here, and you can retry the push from the ticket page.',
-          ]
-        : [],
-      footnote:
-        'When you have fixed it, move the ticket to Ready for Retest and the original test will ' +
-        're-run against your fix.',
-    });
-
-    // The ticket title is created as "BUG-005: <test name>", so prefixing the
-    // key again produced "BUG-005: BUG-005: ...". Only prefix when it is not
-    // already there - the key still has to lead the subject line, because that
-    // is what makes the bug findable in a mail client.
-    const subject = input.title.startsWith(input.bugKey)
-      ? input.title
-      : `${input.bugKey}: ${input.title}`;
-
-    return this.send(input.to, subject.slice(0, 180), body.html, body.text);
-  }
 }
 
 /** "chrome 151 on Windows" rather than 180 characters of UA string. */
@@ -458,14 +380,6 @@ function hostOf(url?: string | null): string {
   } catch {
     return url;
   }
-}
-
-function prettyEnum(v: string): string {
-  return v.replace(/^S\d_/, '').replace(/_/g, ' ').toLowerCase();
-}
-
-function prettyProvider(p: string): string {
-  return p === 'clickup' ? 'ClickUp' : p.charAt(0).toUpperCase() + p.slice(1);
 }
 
 /**

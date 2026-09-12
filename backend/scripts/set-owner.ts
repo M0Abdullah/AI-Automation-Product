@@ -74,27 +74,15 @@ async function main() {
       console.error('Refusing to remove the account you are promoting.');
       process.exit(1);
     }
-    // Runs and tickets reference users optionally, so deleting is safe - the
-    // work stays, it just loses its creator/assignee link.
+    // Runs reference their creator optionally, so deleting is safe - the work
+    // stays, it just moves to the account being promoted.
     await prisma.loginSession.deleteMany({ where: { userId: victim.id } });
-    await prisma.ticket.updateMany({
-      where: { assigneeId: victim.id },
-      data: { assigneeId: null },
-    });
-    await prisma.ticket.updateMany({
-      where: { reporterId: victim.id },
-      data: { reporterId: target.id },
-    });
-    await prisma.ticketComment.updateMany({
-      where: { authorId: victim.id },
-      data: { authorId: target.id },
-    });
     await prisma.run.updateMany({
       where: { createdById: victim.id },
       data: { createdById: target.id },
     });
     await prisma.user.delete({ where: { id: victim.id } });
-    console.log(`Removed account ${victim.email}. Its tickets and runs now belong to ${to}.`);
+    console.log(`Removed account ${victim.email}. Its runs now belong to ${to}.`);
   }
 
   const updated = await prisma.user.update({

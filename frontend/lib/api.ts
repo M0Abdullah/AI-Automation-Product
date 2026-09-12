@@ -12,13 +12,8 @@ import type {
   RunListItem,
   RunPageDetail,
   IntegrationStatus,
-  TicketDestination,
-  TrackerName,
-  TrackerStatus,
   TeamMember,
   TestCase,
-  Ticket,
-  TicketStatus,
 } from './types';
 
 /**
@@ -354,182 +349,12 @@ export const closeFinding = (id: string, note?: string) =>
 export const commentOnFinding = (id: string, note: string) =>
   request<Finding>(`/findings/${id}/comments`, { method: 'POST', body: JSON.stringify({ note }) });
 
-// ----------------------------------------------------------------- tickets
-
-export const createTicket = (
-  findingId: string,
-  body: {
-    /**
-     * WHERE THE BUG GOES. 'jira' | 'clickup' | 'linear' files it in that
-     * tracker in the same request; 'local' keeps it in this tool only.
-     * Omitted = the instance default.
-     */
-    provider?: TicketDestination;
-    title?: string;
-    priority?: string;
-    severity?: string;
-    module?: string;
-    build?: string;
-    assigneeId?: string;
-    labels?: string;
-  },
-) =>
-  request<Ticket>(`/findings/${findingId}/tickets`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const listTickets = (params?: { status?: TicketStatus; assigneeId?: string }) => {
-  const q = new URLSearchParams();
-  if (params?.status) q.set('status', params.status);
-  if (params?.assigneeId) q.set('assigneeId', params.assigneeId);
-  return request<Ticket[]>(`/tickets${q.toString() ? `?${q}` : ''}`);
-};
-
-export const getTicketStats = () => request<Record<TicketStatus, number>>('/tickets/stats');
-
-export const getTicket = (id: string) => request<Ticket>(`/tickets/${id}`);
-
-export const updateTicket = (
-  id: string,
-  body: Partial<{
-    status: string;
-    priority: string;
-    severity: string;
-    module: string;
-    build: string;
-    assigneeId: string;
-    labels: string;
-    title: string;
-  }>,
-) => request<Ticket>(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-
-/**
- * WHICH TRACKER IS CONFIGURED, if any.
- *
- * Drives whether the UI offers "Push to Jira" at all. Showing a button that
- * cannot work is worse than not showing it — the user presses it, gets an
- * error about an env var, and concludes the feature is broken.
- */
-export const getTrackerStatus = () => request<TrackerStatus>('/trackers/status');
-
-/** Everything this instance is wired up to — tracker and email. No secrets. */
+/** Everything this instance is wired up to. No secrets. */
 export const getIntegrations = () => request<IntegrationStatus>('/integrations');
 
 /** Checks the SMTP credentials. Does NOT send a test message. */
 export const verifyMail = () =>
   request<{ ok: boolean; detail: string }>('/integrations/mail/verify', { method: 'POST' });
-
-/** Checks the tracker credentials. Does NOT file a test issue. */
-export const verifyTracker = (provider?: TrackerName) =>
-  request<{ ok: boolean; provider: string; detail: string }>(
-    `/trackers/verify${provider ? `?provider=${provider}` : ''}`,
-    { method: 'POST' },
-  );
-
-/**
- * File this ticket in the configured tracker, or retry a failed push.
- *
- * Idempotent server-side: a ticket already filed returns its existing issue
- * rather than creating a second one.
- */
-export const pushTicket = (id: string, provider?: TrackerName) =>
-  request<{ ok: boolean; detail: string; key?: string; url?: string; warnings?: string[] }>(
-    `/tickets/${id}/push${provider ? `?provider=${provider}` : ''}`,
-    { method: 'POST' },
-  );
-
-export const commentOnTicket = (id: string, body: string) =>
-  request<Ticket>(`/tickets/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) });
-
-export const retestTicket = (id: string) =>
-  request<{ retested: boolean; passed: boolean; suggestion: string }>(`/tickets/${id}/retest`, {
-    method: 'POST',
-  });
-
-export const linkExternalTicket = (
-  id: string,
-  body: { externalKey: string; externalUrl: string; provider?: string },
-) => request<Ticket>(`/tickets/${id}/external`, { method: 'POST', body: JSON.stringify(body) });
-
-// ----------------------------------------------------------------- reports
-
-export const reportUrl = (findingId: string, format: 'pdf' | 'markdown' | 'html') =>
-  `${API_BASE}/findings/${findingId}/report/${format}`;
-
-/**
- * Downloads the PDF through fetch so the Authorization header is sent, then
- * hands the blob to the browser. A plain anchor href cannot attach the token.
- */
-export async function downloadReport(findingId: string, bugKey: string) {
-  const res = await fetch(reportUrl(findingId, 'pdf'), {
-    headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
-  });
-  if (!res.ok) throw new ApiError(`Could not generate the PDF (${res.status})`, res.status);
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${bugKey}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Opens the HTML report in a new tab.
- *
- * It cannot be a plain <a href> — the report endpoint requires a bearer token,
- * and an anchor cannot send headers, so the tab would show a 401. So we fetch it
- * with the token and hand the browser a blob instead.
- *
- * The tab is opened BEFORE the await: browsers only allow window.open during a
- * user gesture, and awaiting first would lose that and get the popup blocked.
- */
-export async function openReport(findingId: string) {
-  const tab = window.open('', '_blank');
-  if (tab) {
-    tab.document.write(
-      '<!doctype html><title>Loading report…</title>' +
-        '<body style="font:15px system-ui;padding:40px;color:#5b6472">Building the report…</body>',
-    );
-  }
-
-  try {
-    const res = await fetch(reportUrl(findingId, 'html'), {
-      headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
-    });
-    if (!res.ok) throw new ApiError(`Could not build the report (${res.status})`, res.status);
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-
-    if (tab) {
-      tab.location.replace(url);
-    } else {
-      // Popup blocked — fall back to the current tab rather than failing silently.
-      window.location.assign(url);
-    }
-
-    // Revoked on a delay: revoking immediately can cancel the navigation before
-    // the new tab has finished reading the blob.
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  } catch (err) {
-    tab?.close();
-    throw err;
-  }
-}
-
-/** Fetches the markdown so it can be copied to the clipboard. */
-export async function fetchReportMarkdown(findingId: string): Promise<string> {
-  const res = await fetch(reportUrl(findingId, 'markdown'), {
-    headers: { Authorization: `Bearer ${tokenStore.access ?? ''}` },
-  });
-  if (!res.ok) throw new ApiError(`Could not build the report (${res.status})`, res.status);
-  return res.text();
-}
 
 // --------------------------------------------------------------- artifacts
 
